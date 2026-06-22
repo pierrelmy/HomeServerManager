@@ -1,0 +1,71 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.text-secondary {
+  color: var(--bs-tertiary-color) !important;
+}
+
+.app-shell {
+  min-height: 100%;
+}
+
+.app-sidebar {
+  width: 180px;
+  min-height: 100%;
+}
+
+.app-sidebar__group {
+  flex-direction: column;
+}
+
+.app-sidebar__button {
+  width: 100%;
+}
+
+@media (max-width: 767.98px) {
+  .app-shell {
+    min-height: 100%;
+  }
+
+  .app-sidebar {
+    width: 100%;
+    min-height: auto;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--bs-border-color) !important;
+  }
+
+  .app-sidebar__group {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .app-sidebar__button {
+    width: calc(50% - 0.25rem);
+  }
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .app-sidebar {
+    height: 100dvh;
+    position: sticky;
+    top: 0;
+    overflow: auto;
+    flex: 0 0 180px;
+  }
+
+  .app-main {
+    height: 100dvh;
+  }
+}
