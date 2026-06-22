@@ -1,6 +1,5 @@
 import type {
   AccountProfile,
-  AuthProvider,
   AuthSession,
   DockerSnapshot,
   NasSnapshot,
@@ -46,9 +45,10 @@ export interface HomelabLiveManager {
   bootstrap(): Promise<void>
   connect(): () => void
   refreshAll(): Promise<void>
-  signIn(provider: AuthProvider): Promise<AuthSession>
+  signIn(email: string, password: string): Promise<AuthSession>
   signOut(): Promise<AuthSession>
   updateSettings(patch: Partial<SettingsState>): Promise<SettingsState>
+  changePassword(currentPassword: string, nextPassword: string): Promise<void>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnImage(id: string, action: "pull" | "run"): Promise<void>
@@ -406,8 +406,8 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
         setReady({ error: error instanceof Error ? error.message : "La synchronisation a échoué" })
       }
     },
-    async signIn(provider: AuthProvider) {
-      const nextSession = await repository.signIn(provider)
+    async signIn(email: string, password: string) {
+      const nextSession = await repository.signIn(email, password)
       session.setState(nextSession)
       await loadAll()
       reconnectRealtime()
@@ -433,6 +433,9 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
       const nextSettings = await repository.updateSettings(patch)
       settings.setState(nextSettings)
       return nextSettings
+    },
+    async changePassword(currentPassword, nextPassword) {
+      await repository.changePassword(currentPassword, nextPassword)
     },
     async actOnService(id, action) {
       const nextService = await repository.actOnService(id, action)

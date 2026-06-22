@@ -50,7 +50,13 @@ export const settingsPatchSchema = z.object({
 }).strict()
 export type SettingsState = Required<z.infer<typeof settingsPatchSchema>>
 
-export interface AuthSession { isAuthenticated: boolean; provider: AuthProvider | null; displayName: string | null }
+export interface AuthSession {
+  isAuthenticated: boolean
+  provider: AuthProvider | null
+  displayName: string | null
+  email: string | null
+  role: Role | null
+}
 export type Role = "admin" | "viewer"
 
 export interface HomelabLiveBundle {

@@ -5,15 +5,30 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      NODE_ENV: production
+      NODE_ENV: development
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       READ_AUTH_REQUIRED: ${READ_AUTH_REQUIRED:-false}
+      DATABASE_PATH: /data/homelab.db
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-Homelab Admin}
+      SYSTEM_ADAPTER: simulation
+      SYSTEM_SERVICE_MAP: ${SYSTEM_SERVICE_MAP:-{}}
+      NAS_SCRUB_COMMAND: ${NAS_SCRUB_COMMAND:-[]}
+      NAS_STATUS_COMMAND: ${NAS_STATUS_COMMAND:-[]}
+      TOOL_COMMANDS: ${TOOL_COMMANDS:-{}}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set}
+    volumes:
+      - homelab-data:/data
     ports:
       - "3000:3000"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
       interval: 10s
       timeout: 3s
       retries: 5
+
+volumes:
+  homelab-data:

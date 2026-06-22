@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify"
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify"
 import cookie from "@fastify/cookie"
 import cors from "@fastify/cors"
 import rateLimit from "@fastify/rate-limit"
@@ -7,31 +7,39 @@ import { ZodError, z } from "zod"
 import type { AppConfig } from "./config.js"
 import { EventHub } from "./events/event-hub.js"
 import { SESSION_COOKIE, SessionStore, toAuthSession, type StoredSession } from "./auth/session-store.js"
-import { InMemoryHomelabRepository } from "./repositories/homelab-repository.js"
+import { SqliteHomelabRepository, type HomelabRepository } from "./repositories/homelab-repository.js"
 import { HomelabService } from "./services/homelab-service.js"
 import { HttpError, forbidden, unauthorized } from "./shared/errors.js"
+import { LocalSystemAdapter, SimulationSystemAdapter, parseCommand, parseCommandMap, parseStringMap } from "./system/system-adapter.js"
 import {
-  authProviderSchema,
   realtimeCommandSchema,
   settingsPatchSchema,
   terminalExecuteSchema,
   type RealtimeEvent,
 } from "./shared/contracts.js"
 
-const sessionBodySchema = z.object({ provider: authProviderSchema }).strict()
+const sessionBodySchema = z.object({
+  provider: z.literal("password"),
+  email: z.string().email().max(254),
+  password: z.string().min(1).max(1_024),
+}).strict()
 const idParamsSchema = z.object({ id: z.string().min(1).max(200) })
 const serviceActionParamsSchema = idParamsSchema.extend({ action: z.enum(["start", "stop", "restart"]) })
 const imageActionParamsSchema = idParamsSchema.extend({ action: z.enum(["pull", "run"]) })
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1).max(1_024),
+  nextPassword: z.string().min(12).max(1_024),
+}).strict()
 
 export interface AppDependencies {
-  repository?: InMemoryHomelabRepository
+  repository?: HomelabRepository
   sessions?: SessionStore
   events?: EventHub
 }
 
 export interface BuiltApp {
   app: FastifyInstance
-  repository: InMemoryHomelabRepository
+  repository: HomelabRepository
   sessions: SessionStore
   events: EventHub
   service: HomelabService
@@ -43,10 +51,23 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     requestIdHeader: "x-request-id",
     disableRequestLogging: config.nodeEnv === "test",
   })
-  const repository = dependencies.repository ?? new InMemoryHomelabRepository()
-  const sessions = dependencies.sessions ?? new SessionStore()
+  const repository = dependencies.repository ?? new SqliteHomelabRepository(config.databasePath)
+  const sessions = dependencies.sessions ?? new SessionStore({
+    databasePath: config.databasePath,
+    adminEmail: config.adminEmail,
+    adminPassword: config.adminPassword,
+    adminDisplayName: config.adminDisplayName,
+  })
   const events = dependencies.events ?? new EventHub()
-  const service = new HomelabService(repository, events)
+  const system = config.systemAdapter === "local"
+    ? new LocalSystemAdapter({
+        serviceMap: parseStringMap(config.systemServiceMap, "SYSTEM_SERVICE_MAP"),
+        nasScrubCommand: parseCommand(config.nasScrubCommand, "NAS_SCRUB_COMMAND"),
+        nasStatusCommand: parseCommand(config.nasStatusCommand, "NAS_STATUS_COMMAND"),
+        toolCommands: parseCommandMap(config.toolCommands, "TOOL_COMMANDS"),
+      })
+    : new SimulationSystemAdapter()
+  const service = new HomelabService(repository, events, system)
 
   await app.register(cookie, { secret: config.sessionSecret, hook: "onRequest" })
   await app.register(cors, {
@@ -55,7 +76,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
       callback(null, !origin || config.corsOrigins.includes(origin))
     },
   })
-  await app.register(rateLimit, { global: false, max: 100, timeWindow: "1 minute" })
+  await app.register(rateLimit, { global: true, max: 100, timeWindow: "1 minute" })
   await app.register(websocket, { options: { maxPayload: 16 * 1_024 } })
 
   const getSession = (request: FastifyRequest): StoredSession | undefined => {
@@ -78,6 +99,21 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   const readGuard = async (request: FastifyRequest): Promise<void> => {
     if (config.readAuthRequired) await requireSession(request)
   }
+
+  const requestCounts = new Map<string, number>()
+  let systemReady = config.systemAdapter !== "local"
+  app.addHook("onResponse", async (request, reply) => {
+    const route = request.routeOptions.url ?? "unknown"
+    const key = `${request.method}|${route}|${reply.statusCode}`
+    requestCounts.set(key, (requestCounts.get(key) ?? 0) + 1)
+  })
+
+  app.addHook("onSend", async (_request, reply) => {
+    void reply.header("X-Content-Type-Options", "nosniff")
+    void reply.header("X-Frame-Options", "DENY")
+    void reply.header("Referrer-Policy", "no-referrer")
+    void reply.header("Cache-Control", "no-store")
+  })
 
   app.addHook("onRequest", async (request) => {
     if (["GET", "HEAD", "OPTIONS"].includes(request.method) || request.url === "/session") return
@@ -103,12 +139,43 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   })
 
   app.get("/health", async () => ({ status: "ok", uptimeSeconds: Math.floor(process.uptime()) }))
-  app.get("/ready", async () => ({ status: "ready" }))
+  app.get("/ready", async (_request, reply) => {
+    try {
+      repository.ping?.()
+      sessions.ping()
+      if (!systemReady) throw new Error("System adapter is not ready")
+      return { status: "ready" }
+    } catch {
+      return reply.status(503).send({ status: "not-ready" })
+    }
+  })
+  app.get("/metrics", async (request, reply) => {
+    if (request.headers.authorization !== `Bearer ${config.metricsToken}`) throw unauthorized()
+    const lines = [
+      "# HELP homelab_uptime_seconds Process uptime in seconds",
+      "# TYPE homelab_uptime_seconds gauge",
+      `homelab_uptime_seconds ${Math.floor(process.uptime())}`,
+      "# HELP homelab_websocket_connections Active WebSocket connections",
+      "# TYPE homelab_websocket_connections gauge",
+      `homelab_websocket_connections ${events.size}`,
+      "# HELP homelab_system_adapter_ready System adapter readiness",
+      "# TYPE homelab_system_adapter_ready gauge",
+      `homelab_system_adapter_ready ${systemReady ? 1 : 0}`,
+      "# HELP homelab_http_requests_total HTTP requests handled",
+      "# TYPE homelab_http_requests_total counter",
+    ]
+    for (const [key, count] of requestCounts) {
+      const [method, route, status] = key.split("|")
+      lines.push(`homelab_http_requests_total{method="${method}",route="${route}",status="${status}"} ${count}`)
+    }
+    return reply.type("text/plain; version=0.0.4").send(`${lines.join("\n")}\n`)
+  })
 
   app.get("/session", async (request) => toAuthSession(getSession(request)))
   app.post("/session", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
-    const { provider } = sessionBodySchema.parse(request.body)
-    const session = sessions.create(provider)
+    const { provider, email, password } = sessionBodySchema.parse(request.body)
+    const session = sessions.authenticatePassword(email, password)
+    if (!session) throw unauthorized("Invalid email or password")
     reply.setCookie(SESSION_COOKIE, session.id, {
       path: "/",
       httpOnly: true,
@@ -135,7 +202,34 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   app.get("/nas", { preHandler: readGuard }, async () => repository.getNas())
   app.get("/tools", { preHandler: readGuard }, async () => repository.getTools())
   app.get("/terminal", { preHandler: readGuard }, async () => repository.getTerminal())
-  app.get("/account", { preHandler: readGuard }, async () => repository.getAccount())
+  app.get("/account", { preHandler: readGuard }, async (request) => {
+    const session = getSession(request)
+    const account = repository.getAccount()
+    if (!session) return account
+    return {
+      ...account,
+      name: session.displayName,
+      email: session.email,
+      role: session.role === "admin" ? "Administrateur" : "Lecture seule",
+      providers: [{ name: "Password", connected: true }],
+      sshKeys: [],
+      sessions: sessions.listUserSessions(session.userId).map((item) => ({
+        device: item.id === session.id ? "Session actuelle" : `Session ${item.id.slice(0, 8)}`,
+        status: item.id === session.id ? "Active" as const : "Idle" as const,
+        lastSeen: `Expire le ${new Date(item.expiresAt).toLocaleString("fr-FR")}`,
+      })),
+    }
+  })
+  app.patch("/account/password", { preHandler: requireSession }, async (request) => {
+    const session = getSession(request)!
+    const body = passwordChangeSchema.parse(request.body)
+    return audited(repository, session, "account.password.update", session.userId, async () => {
+      if (!sessions.changePassword(session.userId, body.currentPassword, body.nextPassword, session.id)) {
+        throw unauthorized("Current password is invalid")
+      }
+      return { success: true }
+    })
+  })
   app.get("/settings", { preHandler: readGuard }, async (request) => repository.getSettings(getSession(request)?.userId ?? "public"))
 
   app.patch("/settings", { preHandler: requireAdmin }, async (request) => {
@@ -150,48 +244,37 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   app.post("/services/:id/:action", { preHandler: requireAdmin }, async (request) => {
     const session = getSession(request)!
     const { id, action } = serviceActionParamsSchema.parse(request.params)
-    const value = service.actOnService(id, action)
-    audit(repository, session, `service.${action}`, id)
-    return value
+    return audited(repository, session, `service.${action}`, id, () => service.actOnService(id, action))
   })
 
   app.post("/docker/containers/:id/:action", { preHandler: requireAdmin }, async (request) => {
     const session = getSession(request)!
     const { id, action } = serviceActionParamsSchema.parse(request.params)
-    const value = service.actOnContainer(id, action)
-    audit(repository, session, `docker.container.${action}`, id)
-    return value
+    return audited(repository, session, `docker.container.${action}`, id, () => service.actOnContainer(id, action))
   })
 
   app.post("/docker/images/:id/:action", { preHandler: requireAdmin }, async (request) => {
     const session = getSession(request)!
     const { id, action } = imageActionParamsSchema.parse(request.params)
-    const value = service.actOnImage(id, action)
-    audit(repository, session, `docker.image.${action}`, id)
-    return value
+    return audited(repository, session, `docker.image.${action}`, id, () => service.actOnImage(id, action))
   })
 
   app.post("/nas/scrub", { preHandler: requireAdmin }, async (request) => {
     const session = getSession(request)!
-    const job = service.runNasScrub()
-    audit(repository, session, "nas.scrub", "nas")
-    return job
+    return audited(repository, session, "nas.scrub", "nas", () => service.runNasScrub())
   })
 
   app.post("/terminal/execute", { preHandler: requireAdmin }, async (request, reply) => {
     const session = getSession(request)!
     const body = terminalExecuteSchema.parse(request.body)
-    const result = service.executeTerminal(body.command, body.sessionId)
-    audit(repository, session, "terminal.execute", body.command)
+    const result = await audited(repository, session, "terminal.execute", body.command, () => service.executeTerminal(body.command, body.sessionId))
     return reply.status(201).send(result)
   })
 
   app.post("/tools/:id/run", { preHandler: requireAdmin }, async (request) => {
     const session = getSession(request)!
     const { id } = idParamsSchema.parse(request.params)
-    const job = service.runTool(id)
-    audit(repository, session, "tool.run", id)
-    return job
+    return audited(repository, session, "tool.run", id, () => service.runTool(id))
   })
 
   app.get("/audit", { preHandler: requireAdmin }, async () => repository.listAudit())
@@ -213,13 +296,12 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     socket.send(JSON.stringify({ type: "bundle.synced", bundle } satisfies RealtimeEvent))
     socket.send(JSON.stringify({ type: "connection.status", status: "connected" } satisfies RealtimeEvent))
 
-    socket.on("message", (raw) => {
+    socket.on("message", async (raw) => {
       try {
         const command = realtimeCommandSchema.parse(JSON.parse(raw.toString()))
         if (command.type === "terminal.execute") {
           if (!session || session.role !== "admin") throw forbidden()
-          service.executeTerminal(command.command, command.sessionId)
-          audit(repository, session, "terminal.execute", command.command)
+          await audited(repository, session, "terminal.execute", command.command, () => service.executeTerminal(command.command, command.sessionId))
           return
         }
         const nextBundle = scopeBundle(command.scope, service.bundle(session?.userId ?? "public"))
@@ -235,18 +317,43 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
 
   let metricsTimer: NodeJS.Timeout | undefined
   app.addHook("onReady", async () => {
-    metricsTimer = setInterval(() => service.refreshOverview(), config.metricsIntervalMs)
+    const refresh = async () => {
+      const errors = await service.refreshSystemState()
+      systemReady = errors.length === 0
+      for (const error of errors) app.log.error({ err: error }, "system state refresh failed")
+    }
+    await refresh()
+    metricsTimer = setInterval(() => void refresh(), config.metricsIntervalMs)
     metricsTimer.unref()
   })
   app.addHook("onClose", async () => {
     if (metricsTimer) clearInterval(metricsTimer)
+    repository.close?.()
+    sessions.close()
   })
 
   return { app, repository, sessions, events, service }
 }
 
-function audit(repository: InMemoryHomelabRepository, session: StoredSession, action: string, resource: string): void {
+function audit(repository: HomelabRepository, session: StoredSession, action: string, resource: string): void {
   repository.appendAudit({ sessionId: session.id, actor: session.displayName, action, resource, outcome: "success" })
+}
+
+async function audited<T>(
+  repository: HomelabRepository,
+  session: StoredSession,
+  action: string,
+  resource: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    const result = await operation()
+    audit(repository, session, action, resource)
+    return result
+  } catch (error) {
+    repository.appendAudit({ sessionId: session.id, actor: session.displayName, action, resource, outcome: "failure" })
+    throw error
+  }
 }
 
 function scopeBundle(scope: string, bundle: ReturnType<HomelabService["bundle"]>): Partial<ReturnType<HomelabService["bundle"]>> {

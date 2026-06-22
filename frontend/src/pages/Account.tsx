@@ -1,10 +1,35 @@
-import { Badge, Card, ListGroup } from "react-bootstrap"
-import { IconBrandGithub, IconBrandGoogle, IconKey, IconUserCircle } from "@tabler/icons-react"
-import { useHomelabAccount, useHomelabLiveState } from "../live/useHomelabLive"
+import { useState } from "react"
+import { Alert, Badge, Button, Card, Form, ListGroup } from "react-bootstrap"
+import { IconKey, IconUserCircle } from "@tabler/icons-react"
+import { useHomelabAccount, useHomelabLiveManager, useHomelabLiveState } from "../live/useHomelabLive"
+import { useAuthSession } from "../hooks/useAuthSession"
+import { useNavigate } from "react-router-dom"
 
 export default function AccountPage() {
   const liveState = useHomelabLiveState()
   const account = useHomelabAccount()
+  const liveManager = useHomelabLiveManager()
+  const { signOut } = useAuthSession()
+  const navigate = useNavigate()
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [nextPassword, setNextPassword] = useState("")
+  const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "danger"; text: string } | null>(null)
+  const [savingPassword, setSavingPassword] = useState(false)
+
+  const changePassword = async () => {
+    setSavingPassword(true)
+    setPasswordMessage(null)
+    try {
+      await liveManager.changePassword(currentPassword, nextPassword)
+      setCurrentPassword("")
+      setNextPassword("")
+      setPasswordMessage({ type: "success", text: "Mot de passe mis à jour. Les autres sessions ont été révoquées." })
+    } catch (error) {
+      setPasswordMessage({ type: "danger", text: error instanceof Error ? error.message : "La mise à jour a échoué" })
+    } finally {
+      setSavingPassword(false)
+    }
+  }
 
   if (!liveState.ready || !account) {
     return <div className="p-3 p-lg-4">Chargement du compte...</div>
@@ -18,6 +43,7 @@ export default function AccountPage() {
           <h1 className="mb-0">Account</h1>
           <p className="text-secondary mb-0">Compte utilisateur, méthodes d’authentification et sessions actives.</p>
         </div>
+        <Button variant="outline-danger" onClick={() => void signOut().then(() => navigate("/login"))}>Se déconnecter</Button>
       </div>
 
       <div className="row g-3">
@@ -48,7 +74,7 @@ export default function AccountPage() {
                   {account.providers.map((provider) => (
                     <div key={provider.name} className="d-flex align-items-center justify-content-between">
                       <span className="d-flex align-items-center gap-2">
-                        {provider.name === "Google" ? <IconBrandGoogle size={18} /> : <IconBrandGithub size={18} />}
+                        <IconKey size={18} />
                         {provider.name}
                       </span>
                       <Badge bg={provider.connected ? "success" : "secondary"}>{provider.connected ? "Connecté" : "Déconnecté"}</Badge>
@@ -56,6 +82,20 @@ export default function AccountPage() {
                   ))}
                 </div>
               </div>
+
+              <Form onSubmit={(event) => { event.preventDefault(); void changePassword() }} className="border rounded p-3">
+                <div className="fw-semibold mb-3">Changer le mot de passe</div>
+                {passwordMessage ? <Alert variant={passwordMessage.type}>{passwordMessage.text}</Alert> : null}
+                <Form.Group className="mb-3">
+                  <Form.Label>Mot de passe actuel</Form.Label>
+                  <Form.Control type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Nouveau mot de passe</Form.Label>
+                  <Form.Control type="password" autoComplete="new-password" minLength={12} value={nextPassword} onChange={(event) => setNextPassword(event.target.value)} required />
+                </Form.Group>
+                <Button type="submit" disabled={savingPassword}>Mettre à jour</Button>
+              </Form>
             </Card.Body>
           </Card>
         </div>

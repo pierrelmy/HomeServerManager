@@ -1,0 +1,23 @@
+[Unit]
+Description=HomeServerManager backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=homelab
+Group=homelab
+SupplementaryGroups=docker
+WorkingDirectory=/opt/homeservermanager/backend
+EnvironmentFile=/etc/homeservermanager/backend.env
+ExecStart=/usr/bin/node /opt/homeservermanager/backend/dist/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homeservermanager
+
+[Install]
+WantedBy=multi-user.target

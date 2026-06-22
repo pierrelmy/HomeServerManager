@@ -1,0 +1,12 @@
+# Install as /etc/sudoers.d/homeservermanager with mode 0440 and validate with visudo -cf.
+# Keep this list aligned with SYSTEM_SERVICE_MAP and NAS_SCRUB_COMMAND.
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start ollama.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop ollama.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart ollama.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start jenkins.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop jenkins.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart jenkins.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start docker.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop docker.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart docker.service
+homelab ALL=(root) NOPASSWD: /usr/sbin/zpool scrub pool-data

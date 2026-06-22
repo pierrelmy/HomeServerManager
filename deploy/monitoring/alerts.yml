@@ -1,0 +1,18 @@
+groups:
+  - name: homeservermanager
+    rules:
+      - alert: HomeServerManagerDown
+        expr: up{job="homeservermanager"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: HomeServerManager is unavailable
+
+      - alert: HomeServerSystemAdapterNotReady
+        expr: homelab_system_adapter_ready == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: A system integration is failing

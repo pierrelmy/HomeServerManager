@@ -11,6 +11,7 @@ export default function NasPage() {
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "danger"; text: string } | null>(null)
 
   const runScrub = async () => {
+    if (!window.confirm("Confirmer le lancement du scrub NAS ? Cette opération peut être longue.")) return
     setScrubRunning(true)
     setActionMessage(null)
     try {

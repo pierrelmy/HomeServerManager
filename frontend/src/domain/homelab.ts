@@ -176,4 +176,6 @@ export interface AuthSession {
   isAuthenticated: boolean
   provider: AuthProvider | null
   displayName: string | null
+  email: string | null
+  role: "admin" | "viewer" | null
 }

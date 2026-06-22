@@ -9,5 +9,8 @@ export function createHomelabRealtimeTransport(): HomelabRealtimeTransport {
     return createMockHomelabRealtimeTransport()
   }
 
-  return createWebsocketHomelabRealtimeTransport(wsUrl)
+  const resolvedUrl = wsUrl.startsWith("/")
+    ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${wsUrl}`
+    : wsUrl
+  return createWebsocketHomelabRealtimeTransport(resolvedUrl)
 }
