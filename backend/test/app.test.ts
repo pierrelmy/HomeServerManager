@@ -114,6 +114,29 @@ describe("homelab API", () => {
     ]))
   })
 
+  it("rate-limits terminal command execution", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await instance.app.inject({
+        method: "POST",
+        url: "/terminal/execute",
+        headers: { cookie },
+        payload: { command: "uptime" },
+      })
+      expect(response.statusCode, `attempt ${attempt + 1}`).toBe(201)
+    }
+
+    const limited = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/execute",
+      headers: { cookie },
+      payload: { command: "uptime" },
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
   it("protects and exposes Prometheus metrics", async () => {
     const instance = await setup()
     const denied = await instance.app.inject({ method: "GET", url: "/metrics" })

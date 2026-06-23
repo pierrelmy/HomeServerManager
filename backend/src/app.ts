@@ -101,6 +101,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   }
 
   const requestCounts = new Map<string, number>()
+  const websocketTerminalLimits = new Map<string, { count: number; windowStartedAt: number }>()
   let systemReady = config.systemAdapter !== "local"
   app.addHook("onResponse", async (request, reply) => {
     const route = request.routeOptions.url ?? "unknown"
@@ -128,6 +129,14 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     }
     if (error instanceof HttpError) {
       void reply.status(error.statusCode).send({ error: error.code, message: error.message, requestId: request.id })
+      return
+    }
+    if (error instanceof Error && "statusCode" in error && typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500) {
+      void reply.status(error.statusCode).send({
+        error: "code" in error && typeof error.code === "string" ? error.code : "REQUEST_ERROR",
+        message: error.message,
+        requestId: request.id,
+      })
       return
     }
     request.log.error({ err: error }, "request failed")
@@ -241,37 +250,37 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     return settings
   })
 
-  app.post("/services/:id/:action", { preHandler: requireAdmin }, async (request) => {
+  app.post("/services/:id/:action", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id, action } = serviceActionParamsSchema.parse(request.params)
     return audited(repository, session, `service.${action}`, id, () => service.actOnService(id, action))
   })
 
-  app.post("/docker/containers/:id/:action", { preHandler: requireAdmin }, async (request) => {
+  app.post("/docker/containers/:id/:action", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id, action } = serviceActionParamsSchema.parse(request.params)
     return audited(repository, session, `docker.container.${action}`, id, () => service.actOnContainer(id, action))
   })
 
-  app.post("/docker/images/:id/:action", { preHandler: requireAdmin }, async (request) => {
+  app.post("/docker/images/:id/:action", { preHandler: requireAdmin, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id, action } = imageActionParamsSchema.parse(request.params)
     return audited(repository, session, `docker.image.${action}`, id, () => service.actOnImage(id, action))
   })
 
-  app.post("/nas/scrub", { preHandler: requireAdmin }, async (request) => {
+  app.post("/nas/scrub", { preHandler: requireAdmin, config: { rateLimit: { max: 2, timeWindow: "1 hour" } } }, async (request) => {
     const session = getSession(request)!
     return audited(repository, session, "nas.scrub", "nas", () => service.runNasScrub())
   })
 
-  app.post("/terminal/execute", { preHandler: requireAdmin }, async (request, reply) => {
+  app.post("/terminal/execute", { preHandler: requireAdmin, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const session = getSession(request)!
     const body = terminalExecuteSchema.parse(request.body)
     const result = await audited(repository, session, "terminal.execute", body.command, () => service.executeTerminal(body.command, body.sessionId))
     return reply.status(201).send(result)
   })
 
-  app.post("/tools/:id/run", { preHandler: requireAdmin }, async (request) => {
+  app.post("/tools/:id/run", { preHandler: requireAdmin, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id } = idParamsSchema.parse(request.params)
     return audited(repository, session, "tool.run", id, () => service.runTool(id))
@@ -301,6 +310,9 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
         const command = realtimeCommandSchema.parse(JSON.parse(raw.toString()))
         if (command.type === "terminal.execute") {
           if (!session || session.role !== "admin") throw forbidden()
+          if (!consumeFixedWindow(websocketTerminalLimits, session.id, 10, 60_000)) {
+            throw new HttpError(429, "Terminal command rate limit exceeded", "RATE_LIMITED")
+          }
           await audited(repository, session, "terminal.execute", command.command, () => service.executeTerminal(command.command, command.sessionId))
           return
         }
@@ -359,4 +371,21 @@ async function audited<T>(
 function scopeBundle(scope: string, bundle: ReturnType<HomelabService["bundle"]>): Partial<ReturnType<HomelabService["bundle"]>> {
   if (scope === "all") return bundle
   return { [scope]: bundle[scope as keyof typeof bundle] }
+}
+
+function consumeFixedWindow(
+  limits: Map<string, { count: number; windowStartedAt: number }>,
+  key: string,
+  max: number,
+  windowMs: number,
+  now = Date.now(),
+): boolean {
+  const current = limits.get(key)
+  if (!current || now - current.windowStartedAt >= windowMs) {
+    limits.set(key, { count: 1, windowStartedAt: now })
+    return true
+  }
+  if (current.count >= max) return false
+  current.count += 1
+  return true
 }
