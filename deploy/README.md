@@ -13,7 +13,7 @@
 
 ## GitHub
 
-Créer un environnement `production` avec approbation obligatoire et les secrets :
+Créer un environnement `production`, le limiter aux branches protégées et y ajouter les secrets :
 
 - `PRODUCTION_HOST`
 - `PRODUCTION_USER`
@@ -21,6 +21,8 @@ Créer un environnement `production` avec approbation obligatoire et les secrets
 - `PRODUCTION_SSH_KNOWN_HOSTS`
 - `PRODUCTION_GHCR_USERNAME`
 - `PRODUCTION_GHCR_TOKEN` avec accès en lecture au package
+
+Ajouter un reviewer obligatoire si le plan GitHub du dépôt le permet. Sur un dépôt privé sans cette fonctionnalité, conserver le workflow de déploiement en déclenchement manuel et la restriction aux branches protégées.
 
 Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image`, `Frontend Docker image` et CodeQL. Le dépôt privé n’ayant pas GitHub Code Security activé, CodeQL conserve son rapport SARIF comme artefact du workflow pendant 30 jours.
 
