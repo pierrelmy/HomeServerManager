@@ -22,7 +22,7 @@ Créer un environnement `production` avec approbation obligatoire et les secrets
 - `PRODUCTION_GHCR_USERNAME`
 - `PRODUCTION_GHCR_TOKEN` avec accès en lecture au package
 
-Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image` et CodeQL.
+Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image`, `Frontend Docker image` et CodeQL. Le dépôt privé n’ayant pas GitHub Code Security activé, CodeQL conserve son rapport SARIF comme artefact du workflow pendant 30 jours.
 
 Un tag `vX.Y.Z` publie les images GHCR. Le workflow `Deploy production` reste manuel et demande la révision exacte à déployer.
 

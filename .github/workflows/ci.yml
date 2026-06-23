@@ -48,12 +48,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: End-to-end tests
-        run: npm run test:e2e
-
       - name: Build
         run: npm run build
 
@@ -88,6 +82,12 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
       - name: Build
         run: npm run build
 
@@ -103,3 +103,16 @@ jobs:
 
       - name: Build image
         run: docker build --tag homelab-backend:ci ./backend
+
+  frontend-image:
+    name: Frontend Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build image
+        run: docker build --tag homelab-frontend:ci ./frontend
