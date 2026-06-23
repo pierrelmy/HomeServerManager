@@ -50,11 +50,17 @@ npm test
 npm run build
 ```
 
-## Déploiement Docker
+## Conteneur de développement
 
 ```bash
 cd infra
-SESSION_SECRET="$(openssl rand -hex 32)" docker compose up --build
+SESSION_SECRET="$(openssl rand -hex 32)" \
+ADMIN_EMAIL="admin@localhost.test" \
+ADMIN_PASSWORD="development-password" \
+METRICS_TOKEN="development-metrics-token" \
+docker compose up --build
 ```
+
+Ce Compose utilise volontairement l’adaptateur simulé. Pour piloter le système réel sans exposer des interfaces privilégiées dans un conteneur, utiliser le service systemd et la stack Caddy/frontend décrits dans `../deploy/README.md`.
 
 L'état métier est actuellement fourni par un repository en mémoire, isolé derrière une interface. Les snapshots correspondent exactement au contrat du frontend ; le branchement ultérieur sur PostgreSQL, Docker Engine, systemd ou un NAS ne modifie pas les routes.

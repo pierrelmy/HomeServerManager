@@ -185,6 +185,7 @@ export default function DockerPage() {
 
   const runContainerAction = async (action: DockerAction["id"], resourceId: string) => {
     if (action !== "start" && action !== "stop" && action !== "restart") return
+    if (action !== "start" && !window.confirm(`Confirmer l’action « ${action} » sur ce conteneur ?`)) return
     const key = `${resourceId}:${action}`
     setBusyAction(key)
     setActionError(null)
@@ -199,6 +200,7 @@ export default function DockerPage() {
 
   const runImageAction = async (action: DockerAction["id"], resourceId: string) => {
     if (action !== "pull" && action !== "run") return
+    if (action === "run" && !window.confirm("Confirmer la création d’un nouveau conteneur depuis cette image ?")) return
     const key = `${resourceId}:${action}`
     setBusyAction(key)
     setActionError(null)

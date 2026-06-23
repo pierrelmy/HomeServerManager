@@ -138,6 +138,7 @@ export default function Services() {
   const [actionError, setActionError] = useState<string | null>(null)
 
   const handleAction = async (serviceId: string, action: "start" | "stop" | "restart") => {
+    if (action !== "start" && !window.confirm(`Confirmer l’action « ${action} » sur le service ${serviceId} ?`)) return
     const key = `${serviceId}:${action}`
     setBusyAction(key)
     setActionError(null)

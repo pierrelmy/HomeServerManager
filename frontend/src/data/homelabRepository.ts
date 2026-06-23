@@ -1,6 +1,5 @@
 import type {
   AccountProfile,
-  AuthProvider,
   AuthSession,
   DockerSnapshot,
   DockerContainer,
@@ -15,7 +14,7 @@ import type {
 
 export interface HomelabRepository {
   getSession(): Promise<AuthSession>
-  signIn(provider: AuthProvider): Promise<AuthSession>
+  signIn(email: string, password: string): Promise<AuthSession>
   signOut(): Promise<AuthSession>
   getOverview(): Promise<OverviewSnapshot>
   listServices(): Promise<ServiceRecord[]>
@@ -26,6 +25,7 @@ export interface HomelabRepository {
   getAccountProfile(): Promise<AccountProfile>
   getSettings(): Promise<SettingsState>
   updateSettings(patch: Partial<SettingsState>): Promise<SettingsState>
+  changePassword(currentPassword: string, nextPassword: string): Promise<void>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<DockerContainer>
   actOnImage(id: string, action: "pull" | "run"): Promise<DockerSnapshot>

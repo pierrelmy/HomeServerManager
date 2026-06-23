@@ -1,6 +1,5 @@
 import type {
   AccountProfile,
-  AuthProvider,
   AuthSession,
   DockerSnapshot,
   DockerContainer,
@@ -15,7 +14,8 @@ import type {
 import type { HomelabRepository } from "./homelabRepository"
 
 async function fetchJson<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(new URL(path, baseUrl), {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl
+  const response = await fetch(`${normalizedBase}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
@@ -32,10 +32,10 @@ async function fetchJson<T>(baseUrl: string, path: string, init?: RequestInit): 
 export function createHttpHomelabRepository(baseUrl: string): HomelabRepository {
   return {
     getSession: () => fetchJson<AuthSession>(baseUrl, "/session"),
-    signIn: (provider: AuthProvider) =>
+    signIn: (email: string, password: string) =>
       fetchJson<AuthSession>(baseUrl, "/session", {
         method: "POST",
-        body: JSON.stringify({ provider }),
+        body: JSON.stringify({ provider: "password", email, password }),
       }),
     signOut: () =>
       fetchJson<AuthSession>(baseUrl, "/session", {
@@ -54,6 +54,12 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
         method: "PATCH",
         body: JSON.stringify(patch),
       }),
+    changePassword: async (currentPassword, nextPassword) => {
+      await fetchJson<{ success: true }>(baseUrl, "/account/password", {
+        method: "PATCH",
+        body: JSON.stringify({ currentPassword, nextPassword }),
+      })
+    },
     actOnService: (id, action) =>
       fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     actOnContainer: (id, action) =>

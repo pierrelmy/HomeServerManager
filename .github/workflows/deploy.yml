@@ -1,0 +1,79 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to homelab
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Build backend
+        working-directory: backend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Resolve revision
+        id: revision
+        run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Upload application
+        env:
+          HOST: ${{ secrets.PRODUCTION_HOST }}
+          USER: ${{ secrets.PRODUCTION_USER }}
+        run: |
+          rsync -az --delete backend/dist backend/package.json backend/package-lock.json "$USER@$HOST:/opt/homeservermanager/backend/"
+          rsync -az deploy/ "$USER@$HOST:/opt/homeservermanager/deploy/"
+
+      - name: Activate release
+        env:
+          HOST: ${{ secrets.PRODUCTION_HOST }}
+          USER: ${{ secrets.PRODUCTION_USER }}
+          GHCR_USERNAME: ${{ secrets.PRODUCTION_GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.PRODUCTION_GHCR_TOKEN }}
+          REVISION: ${{ steps.revision.outputs.short }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh "$USER@$HOST" "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+          ssh "$USER@$HOST" "cd /opt/homeservermanager/backend && npm ci --omit=dev --no-audit --no-fund"
+          ssh "$USER@$HOST" "cd /opt/homeservermanager/deploy && FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/homeservermanager-frontend:sha-$REVISION docker compose -f compose.production.yaml pull frontend && FRONTEND_IMAGE=ghcr.io/${{ github.repository_owner }}/homeservermanager-frontend:sha-$REVISION docker compose -f compose.production.yaml up -d"
+          ssh "$USER@$HOST" "sudo systemctl restart homeservermanager && sudo systemctl is-active --quiet homeservermanager"

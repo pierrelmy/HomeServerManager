@@ -1,4 +1,4 @@
-import type { AuthProvider, AuthSession } from "../domain/homelab"
+import type { AuthSession } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabSession } from "../live/useHomelabLive"
 
 export function useAuthSession() {
@@ -6,7 +6,7 @@ export function useAuthSession() {
   const session = useHomelabSession()
   const state = useHomelabLiveState()
 
-  const signIn = async (provider: AuthProvider): Promise<AuthSession> => liveManager.signIn(provider)
+  const signIn = async (email: string, password: string): Promise<AuthSession> => liveManager.signIn(email, password)
   const signOut = async (): Promise<AuthSession> => liveManager.signOut()
 
   return {

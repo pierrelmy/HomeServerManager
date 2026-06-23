@@ -9,6 +9,7 @@ import type {
   TerminalLine,
 } from "../shared/contracts.js"
 import { conflict, notFound } from "../shared/errors.js"
+import type { SystemAdapter } from "../system/system-adapter.js"
 
 function timeStamp(): string {
   return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date())
@@ -31,7 +32,11 @@ function systemUptime(): number {
 }
 
 export class HomelabService {
-  constructor(private readonly repository: HomelabRepository, private readonly events: EventHub) {}
+  constructor(
+    private readonly repository: HomelabRepository,
+    private readonly events: EventHub,
+    private readonly system: SystemAdapter,
+  ) {}
 
   bundle(ownerId = "public"): HomelabLiveBundle {
     return {
@@ -70,19 +75,47 @@ export class HomelabService {
     this.events.broadcast({ type: "overview.updated", overview })
   }
 
+  async refreshSystemState(): Promise<Error[]> {
+    this.refreshOverview()
+    if (this.system.mode !== "local") return []
+
+    const results = await Promise.allSettled([
+      this.system.collectServices(this.repository.listServices()),
+      this.system.collectDocker(),
+      this.system.collectNas(),
+    ])
+    const [servicesResult, dockerResult, nasResult] = results
+    if (servicesResult?.status === "fulfilled" && servicesResult.value) {
+      for (const service of servicesResult.value) this.repository.saveService(service)
+      this.events.broadcast({ type: "services.updated", services: servicesResult.value })
+    }
+    if (dockerResult?.status === "fulfilled" && dockerResult.value) {
+      this.repository.saveDocker(dockerResult.value)
+      this.events.broadcast({ type: "docker.updated", docker: dockerResult.value })
+    }
+    if (nasResult?.status === "fulfilled" && nasResult.value) {
+      this.repository.saveNas(nasResult.value)
+      this.events.broadcast({ type: "nas.updated", nas: nasResult.value })
+    }
+    return results.flatMap((result) => result.status === "rejected"
+      ? [result.reason instanceof Error ? result.reason : new Error(String(result.reason))]
+      : [])
+  }
+
   updateSettings(ownerId: string, patch: Partial<SettingsState>): SettingsState {
     const settings = { ...this.repository.getSettings(ownerId), ...patch }
     this.repository.saveSettings(ownerId, settings)
     return settings
   }
 
-  actOnService(id: string, action: "start" | "stop" | "restart"): ServiceRecord {
+  async actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord> {
     const service = this.repository.getService(id)
     if (!service) throw notFound(`Unknown service: ${id}`)
     if (action === "start" && !["stopped", "failed"].includes(service.status)) throw conflict(`Service ${id} cannot be started from ${service.status}`)
     if (action === "stop" && !["starting", "running"].includes(service.status)) throw conflict(`Service ${id} cannot be stopped from ${service.status}`)
     if (action === "restart" && service.status === "stopped") throw conflict(`Stopped service ${id} cannot be restarted`)
 
+    await this.system.actOnService(id, action)
     service.status = action === "stop" ? "stopped" : "running"
     const log = { timestamp: timeStamp(), verbosity: "info" as const, content: `Service ${action} completed` }
     service.logs = [...service.logs, log].slice(-100)
@@ -91,10 +124,11 @@ export class HomelabService {
     return service
   }
 
-  actOnContainer(id: string, action: "start" | "stop" | "restart") {
+  async actOnContainer(id: string, action: "start" | "stop" | "restart") {
     const docker = this.repository.getDocker()
     const container = docker.containers.find((item) => item.id === id)
     if (!container) throw notFound(`Unknown container: ${id}`)
+    await this.system.actOnContainer(id, action)
     if (action !== "stop") container.lastStarted = relativeDate()
     container.cpuPercent = action === "stop" ? 0 : Math.max(container.cpuPercent, 1)
     this.repository.saveDocker(docker)
@@ -102,10 +136,11 @@ export class HomelabService {
     return container
   }
 
-  actOnImage(id: string, action: "pull" | "run") {
+  async actOnImage(id: string, action: "pull" | "run") {
     const docker = this.repository.getDocker()
     const image = docker.images.find((item) => item.id === id)
     if (!image) throw notFound(`Unknown image: ${id}`)
+    await this.system.actOnImage(`${image.name}:${image.tag}`, action)
     image.created = relativeDate()
     if (action === "run") {
       docker.containers.unshift({
@@ -122,7 +157,8 @@ export class HomelabService {
     return docker
   }
 
-  runNasScrub() {
+  async runNasScrub() {
+    await this.system.runNasScrub()
     const tools = this.repository.getTools()
     const job = { label: "Scrub NAS - démarré", when: relativeDate() }
     tools.recentJobs = [job, ...tools.recentJobs].slice(0, 20)
@@ -132,10 +168,11 @@ export class HomelabService {
     return job
   }
 
-  runTool(id: string) {
+  async runTool(id: string) {
     const tools = this.repository.getTools()
     const tool = tools.tools.find((item) => slug(item.title) === id)
     if (!tool) throw notFound(`Unknown tool: ${id}`)
+    await this.system.runTool(id)
     const job = { label: `${tool.title} - succès`, when: relativeDate() }
     tools.recentJobs = [job, ...tools.recentJobs].slice(0, 20)
     this.repository.saveTools(tools)
@@ -143,7 +180,7 @@ export class HomelabService {
     return job
   }
 
-  executeTerminal(command: string, requestedSessionId?: string): { sessionId: string; line: TerminalLine } {
+  async executeTerminal(command: string, requestedSessionId?: string): Promise<{ sessionId: string; line: TerminalLine }> {
     const terminal = this.repository.getTerminal()
     const sessionId = requestedSessionId ?? terminal.activeSessionId
     if (!terminal.sessions.some((session) => session.id === sessionId)) throw notFound(`Unknown terminal session: ${sessionId}`)
@@ -156,7 +193,7 @@ export class HomelabService {
     }
     const executor = allowed[normalized]
     if (!executor) throw conflict("Command is not allowed")
-    const result = executor()
+    const result = await this.system.executeTerminal(normalized) ?? executor()
     const line: TerminalLine = { command, timestamp: timeStamp(), ...result }
     this.repository.appendTerminalLine(sessionId, line)
     this.events.broadcast({ type: "terminal.line.appended", sessionId, line, limit: 100 })

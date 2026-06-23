@@ -12,6 +12,16 @@ const config: AppConfig = {
   logLevel: "silent",
   readAuthRequired: false,
   metricsIntervalMs: 60_000,
+  databasePath: ":memory:",
+  adminEmail: "admin@example.test",
+  adminPassword: "test-password-1234",
+  adminDisplayName: "Pierre Martin",
+  systemAdapter: "simulation",
+  systemServiceMap: "{}",
+  nasScrubCommand: "[]",
+  nasStatusCommand: "[]",
+  toolCommands: "{}",
+  metricsToken: "test-metrics-token-1234",
 }
 
 let built: BuiltApp | undefined
@@ -27,7 +37,11 @@ async function setup(): Promise<BuiltApp> {
 }
 
 async function login(instance: BuiltApp): Promise<string> {
-  const response = await instance.app.inject({ method: "POST", url: "/session", payload: { provider: "password" } })
+  const response = await instance.app.inject({
+    method: "POST",
+    url: "/session",
+    payload: { provider: "password", email: config.adminEmail, password: config.adminPassword },
+  })
   expect(response.statusCode).toBe(200)
   const cookieHeader = response.headers["set-cookie"]
   if (!cookieHeader) throw new Error("Missing session cookie")
@@ -53,7 +67,7 @@ describe("homelab API", () => {
     expect(current.json()).toMatchObject({ isAuthenticated: true, provider: "password", displayName: "Pierre Martin" })
 
     const logout = await instance.app.inject({ method: "DELETE", url: "/session", headers: { cookie } })
-    expect(logout.json()).toEqual({ isAuthenticated: false, provider: null, displayName: null })
+    expect(logout.json()).toEqual({ isAuthenticated: false, provider: null, displayName: null, email: null, role: null })
   })
 
   it("protects mutations and validates settings", async () => {
@@ -93,6 +107,74 @@ describe("homelab API", () => {
     const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "uptime" } })
     expect(accepted.statusCode, accepted.body).toBe(201)
     expect(accepted.json()).toMatchObject({ sessionId: "local-shell", line: { command: "uptime", status: "ok" } })
+
+    const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
+    expect(audit.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "terminal.execute", resource: "rm -rf /", outcome: "failure" }),
+    ]))
+  })
+
+  it("rate-limits terminal command execution", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await instance.app.inject({
+        method: "POST",
+        url: "/terminal/execute",
+        headers: { cookie },
+        payload: { command: "uptime" },
+      })
+      expect(response.statusCode, `attempt ${attempt + 1}`).toBe(201)
+    }
+
+    const limited = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/execute",
+      headers: { cookie },
+      payload: { command: "uptime" },
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
+  it("protects and exposes Prometheus metrics", async () => {
+    const instance = await setup()
+    const denied = await instance.app.inject({ method: "GET", url: "/metrics" })
+    expect(denied.statusCode).toBe(401)
+
+    const metrics = await instance.app.inject({
+      method: "GET",
+      url: "/metrics",
+      headers: { authorization: `Bearer ${config.metricsToken}` },
+    })
+    expect(metrics.statusCode).toBe(200)
+    expect(metrics.body).toContain("homelab_http_requests_total")
+  })
+
+  it("changes the password and rejects the previous credential", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+    const changed = await instance.app.inject({
+      method: "PATCH",
+      url: "/account/password",
+      headers: { cookie },
+      payload: { currentPassword: config.adminPassword, nextPassword: "a-new-strong-password" },
+    })
+    expect(changed.statusCode).toBe(200)
+
+    const oldPassword = await instance.app.inject({
+      method: "POST",
+      url: "/session",
+      payload: { provider: "password", email: config.adminEmail, password: config.adminPassword },
+    })
+    expect(oldPassword.statusCode).toBe(401)
+
+    const newPassword = await instance.app.inject({
+      method: "POST",
+      url: "/session",
+      payload: { provider: "password", email: config.adminEmail, password: "a-new-strong-password" },
+    })
+    expect(newPassword.statusCode).toBe(200)
   })
 
   it("syncs the bundle and executes commands over WebSocket", async () => {

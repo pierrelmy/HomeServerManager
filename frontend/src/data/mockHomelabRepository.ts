@@ -1,6 +1,5 @@
 import type {
   AccountProfile,
-  AuthProvider,
   AuthSession,
   DockerSnapshot,
   NasSnapshot,
@@ -202,6 +201,8 @@ let session: AuthSession = {
   isAuthenticated: true,
   provider: "password",
   displayName: "Pierre Martin",
+  email: "pierre@homeserver.local",
+  role: "admin",
 }
 
 const delay = async <T,>(value: T): Promise<T> => Promise.resolve(value)
@@ -209,16 +210,18 @@ const delay = async <T,>(value: T): Promise<T> => Promise.resolve(value)
 export function createMockHomelabRepository(): HomelabRepository {
   return {
     getSession: async () => delay(session),
-    signIn: async (provider: AuthProvider) => {
+    signIn: async () => {
       session = {
         isAuthenticated: true,
-        provider,
-        displayName: provider === "password" ? "Pierre Martin" : "Pierre Martin",
+        provider: "password",
+        displayName: "Pierre Martin",
+        email: "pierre@homeserver.local",
+        role: "admin",
       }
       return delay(session)
     },
     signOut: async () => {
-      session = { isAuthenticated: false, provider: null, displayName: null }
+      session = { isAuthenticated: false, provider: null, displayName: null, email: null, role: null }
       return delay(session)
     },
     getOverview: async () => delay(overview),
@@ -233,6 +236,7 @@ export function createMockHomelabRepository(): HomelabRepository {
       settings = { ...settings, ...patch }
       return delay(settings)
     },
+    changePassword: async () => delay(undefined),
     actOnService: async (id, action) => {
       const service = services.find((item) => item.id === id)
       if (!service) throw new Error(`Service inconnu : ${id}`)

@@ -1,4 +1,7 @@
 node_modules
 dist
-.env
 coverage
+data
+.env
+*.db*
+npm-debug.log*
