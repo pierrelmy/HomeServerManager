@@ -22,7 +22,7 @@ Créer un environnement `production`, le limiter aux branches protégées, impos
 - `PRODUCTION_GHCR_USERNAME`
 - `PRODUCTION_GHCR_TOKEN` avec accès en lecture au package
 
-Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image`, `Frontend Docker image` et CodeQL. Activer aussi Secret Scanning, Push Protection et les mises à jour de sécurité Dependabot.
+Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image`, `Frontend Docker image` et CodeQL. Activer aussi Secret Scanning, Push Protection, les mises à jour de sécurité Dependabot et l’épinglage SHA des actions.
 
 Un tag `vX.Y.Z` publie les images GHCR. Le workflow `Deploy production` reste manuel et demande la révision exacte à déployer.
 
