@@ -3,6 +3,7 @@
 ## Préparation de l’hôte
 
 1. Installer Node.js 24, Docker, Docker Compose, Caddy via la stack fournie, SQLite, `sudo` et les outils système utilisés.
+   Installer aussi `curl`, `wget` et `rsync`, utilisés par le workflow de déploiement et ses smoke tests.
 2. Créer l’utilisateur `homelab`, l’ajouter au groupe `docker` et créer `/opt/homeservermanager` ainsi que `/var/lib/homeservermanager`.
 3. Copier `homelab-backend.service` dans `/etc/systemd/system/homeservermanager.service`.
 4. Copier `homelab-sudoers` dans `/etc/sudoers.d/homeservermanager`, adapter l’allowlist et valider avec `visudo -cf`.
@@ -25,6 +26,7 @@ Créer un environnement `production`, le limiter aux branches protégées, impos
 Protéger `main` et rendre obligatoires les jobs `Backend`, `Frontend`, `Backend Docker image`, `Frontend Docker image` et CodeQL. Activer aussi Secret Scanning, Push Protection, les mises à jour de sécurité Dependabot et l’épinglage SHA des actions.
 
 Un tag `vX.Y.Z` publie les images GHCR. Le workflow `Deploy production` reste manuel et demande la révision exacte à déployer.
+Avant toute copie ou activation, ce workflow vérifie la présence des six secrets requis. Après activation, il exécute un smoke test sur le backend (`/health`, `/ready`) et sur le frontend (`/healthz` dans le conteneur Nginx).
 
 ## Premier démarrage
 
