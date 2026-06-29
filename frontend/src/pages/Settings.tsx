@@ -128,9 +128,9 @@ export default function SettingsPage() {
               <div className="border rounded p-3">
                 <div className="fw-semibold mb-2">Notes</div>
                 <ul className="text-secondary mb-0">
-                  <li>Les changements restent locaux tant qu’aucun backend n’est branché.</li>
-                  <li>Les réglages peuvent plus tard être persistés par utilisateur.</li>
-                  <li>Le slider sert surtout à simuler un paramètre de densité globale.</li>
+                  <li>Les changements sont enregistrés par le backend puis renvoyés au frontend.</li>
+                  <li>Les réglages sont partagés avec la session connectée sur cette instance.</li>
+                  <li>Le slider de densité reste un réglage de présentation du dashboard.</li>
                 </ul>
               </div>
             </Card.Body>

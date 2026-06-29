@@ -71,7 +71,9 @@ export default function AccountPage() {
               <div className="border rounded p-3">
                 <div className="text-secondary small mb-2">Méthodes reliées</div>
                 <div className="d-flex flex-column gap-2">
-                  {account.providers.map((provider) => (
+                  {account.providers.length === 0 ? (
+                    <div className="text-secondary small">Aucune méthode supplémentaire reliée.</div>
+                  ) : account.providers.map((provider) => (
                     <div key={provider.name} className="d-flex align-items-center justify-content-between">
                       <span className="d-flex align-items-center gap-2">
                         <IconKey size={18} />
@@ -111,7 +113,9 @@ export default function AccountPage() {
                     <span className="fw-semibold">Clés SSH</span>
                   </div>
                   <ListGroup>
-                    {account.sshKeys.map((key) => (
+                    {account.sshKeys.length === 0 ? (
+                      <ListGroup.Item className="text-secondary">Aucune clé SSH enregistrée.</ListGroup.Item>
+                    ) : account.sshKeys.map((key) => (
                       <ListGroup.Item key={key.name} className="d-flex justify-content-between align-items-center">
                         <div>
                           <div className="fw-semibold">{key.name}</div>
@@ -126,7 +130,9 @@ export default function AccountPage() {
                 <div>
                   <div className="fw-semibold mb-2">Sessions actives</div>
                   <ListGroup>
-                    {account.sessions.map((session) => (
+                    {account.sessions.length === 0 ? (
+                      <ListGroup.Item className="text-secondary">Aucune session active listée.</ListGroup.Item>
+                    ) : account.sessions.map((session) => (
                       <ListGroup.Item key={session.device} className="d-flex justify-content-between align-items-center">
                         <div>
                           <div className="fw-semibold">{session.device}</div>

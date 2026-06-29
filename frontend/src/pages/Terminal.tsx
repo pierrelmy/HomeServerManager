@@ -30,7 +30,7 @@ export default function TerminalPage() {
         <div>
           <p className="text-uppercase text-secondary small mb-1">Shell</p>
           <h1 className="mb-0">Terminal</h1>
-          <p className="text-secondary mb-0">Console locale simulée pour tester des commandes et lire un historique de sortie.</p>
+          <p className="text-secondary mb-0">Console connectée au backend pour exécuter les commandes autorisées et lire leur sortie.</p>
         </div>
 
         <div className="d-flex gap-2">

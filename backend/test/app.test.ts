@@ -151,16 +151,24 @@ describe("homelab API", () => {
 
   it("runs service actions and records an audit entry", async () => {
     const instance = await setup()
+    instance.repository.saveService({
+      id: "demo-service",
+      label: "Demo Service",
+      desc: "Service de test",
+      location: "homelab-demo.service",
+      status: "stopped",
+      logs: [],
+    })
     const cookie = await login(instance)
-    const response = await instance.app.inject({ method: "POST", url: "/services/jenkins/start", headers: { cookie } })
+    const response = await instance.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toMatchObject({ id: "jenkins", status: "running" })
+    expect(response.json()).toMatchObject({ id: "demo-service", status: "running" })
 
-    const conflict = await instance.app.inject({ method: "POST", url: "/services/jenkins/start", headers: { cookie } })
+    const conflict = await instance.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
     expect(conflict.statusCode).toBe(409)
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
-    expect(audit.json()).toEqual(expect.arrayContaining([expect.objectContaining({ action: "service.start", resource: "jenkins" })]))
+    expect(audit.json()).toEqual(expect.arrayContaining([expect.objectContaining({ action: "service.start", resource: "demo-service" })]))
   })
 
   it("only executes allowlisted terminal commands", async () => {
@@ -171,7 +179,7 @@ describe("homelab API", () => {
 
     const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "uptime" } })
     expect(accepted.statusCode, accepted.body).toBe(201)
-    expect(accepted.json()).toMatchObject({ sessionId: "local-shell", line: { command: "uptime", status: "ok" } })
+    expect(accepted.json()).toMatchObject({ sessionId: "terminal", line: { command: "uptime", status: "ok" } })
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
     expect(audit.json()).toEqual(expect.arrayContaining([

@@ -82,7 +82,9 @@ export default function Home() {
               </div>
 
               <div className="d-flex flex-column gap-3">
-                {overview.disks.map((disk) => (
+                {overview.disks.length === 0 ? (
+                  <Alert variant="light" className="mb-0">Aucun disque remonté par le backend.</Alert>
+                ) : overview.disks.map((disk) => (
                   <div key={disk.name} className="border rounded p-3">
                     <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
                       <div>
@@ -109,7 +111,9 @@ export default function Home() {
             <Card.Body>
               <h2 className="h5 mb-3">Alertes récentes</h2>
               <div className="d-flex flex-column gap-2">
-                {overview.alerts.map((alert) => (
+                {overview.alerts.length === 0 ? (
+                  <Alert variant="light" className="mb-0">Aucune alerte.</Alert>
+                ) : overview.alerts.map((alert) => (
                   <div key={alert.label} className="d-flex align-items-start gap-2 p-3 border rounded">
                     {alert.level === "warning" ? (
                       <IconAlertTriangle size={16} className="text-warning mt-1" />
@@ -136,7 +140,9 @@ export default function Home() {
           </div>
 
           <div className="d-flex flex-column gap-2">
-            {overview.logs.map((log) => (
+            {overview.logs.length === 0 ? (
+              <Alert variant="light" className="mb-0">Aucun log récent.</Alert>
+            ) : overview.logs.map((log) => (
               <div key={`${log.timestamp}-${log.source}`} className="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 border rounded p-3">
                 <div className="d-flex align-items-center gap-2">
                   <span className="font-monospace text-secondary">{log.timestamp}</span>

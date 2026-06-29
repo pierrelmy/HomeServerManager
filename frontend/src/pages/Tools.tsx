@@ -67,7 +67,11 @@ export default function ToolsPage() {
       ) : null}
 
       <div className="row g-3">
-        {tools.tools.map((tool) => {
+        {tools.tools.length === 0 ? (
+          <div className="col-12">
+            <Alert variant="light" className="mb-0">Aucun outil configuré sur cette instance.</Alert>
+          </div>
+        ) : tools.tools.map((tool) => {
           const Icon = iconByTag[tool.tag] ?? IconTools
 
           return (
@@ -107,7 +111,9 @@ export default function ToolsPage() {
         <Card.Body>
           <h2 className="h5 mb-3">Derniers travaux</h2>
           <div className="d-flex flex-column gap-2">
-            {tools.recentJobs.map((job) => (
+            {tools.recentJobs.length === 0 ? (
+              <Alert variant="light" className="mb-0">Aucun travail récent.</Alert>
+            ) : tools.recentJobs.map((job) => (
               <div key={job.label} className="d-flex justify-content-between align-items-center border rounded p-3">
                 <span>{job.label}</span>
                 <span className="text-secondary small">{job.when}</span>

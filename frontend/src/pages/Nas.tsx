@@ -112,7 +112,9 @@ export default function NasPage() {
               </div>
 
               <div className="d-flex flex-column gap-3">
-                {nas.pools.map((pool) => (
+                {nas.pools.length === 0 ? (
+                  <Alert variant="light" className="mb-0">Aucun pool remonté par le backend.</Alert>
+                ) : nas.pools.map((pool) => (
                   <div key={pool.name} className="border rounded p-3">
                     <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
                       <div>
@@ -144,7 +146,9 @@ export default function NasPage() {
             <Card.Body>
               <h2 className="h5 mb-3">Sauvegardes récentes</h2>
               <div className="d-flex flex-column gap-2">
-                {nas.backups.map((item) => (
+                {nas.backups.length === 0 ? (
+                  <Alert variant="light" className="mb-0">Aucune sauvegarde remontée par le backend.</Alert>
+                ) : nas.backups.map((item) => (
                   <div key={item.label} className="d-flex justify-content-between align-items-center border rounded p-3">
                     <div>
                       <div className="fw-semibold">{item.label}</div>
@@ -176,7 +180,11 @@ export default function NasPage() {
               </tr>
             </thead>
             <tbody>
-              {nas.drives.map((drive) => (
+              {nas.drives.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="text-secondary">Aucun disque remonté par le backend.</td>
+                </tr>
+              ) : nas.drives.map((drive) => (
                 <tr key={drive.slot}>
                   <td>{drive.slot}</td>
                   <td>{drive.model}</td>

@@ -1,6 +1,6 @@
 # HomeServerManager frontend
 
-Application React + Vite du dashboard homelab. Elle consomme l’API Fastify, maintient un état live via `/live` et peut aussi tourner en mode mock sans backend.
+Application React + Vite du dashboard homelab. Elle consomme l’API Fastify et maintient un état live via `/live`.
 
 ## Prérequis
 
@@ -42,24 +42,14 @@ VITE_WS_URL=ws://192.168.64.6:3000/live
 
 Le service frontend dev tourne sous l'utilisateur `ubuntu` et n'a le droit d'écrire que dans `node_modules/.vite-temp`.
 
-### Mode mock sans backend
+### Résolution automatique en dev local
 
-Si `VITE_API_BASE_URL` et `VITE_WS_URL` ne sont pas définies, le frontend bascule automatiquement sur :
+Si `VITE_API_BASE_URL` et `VITE_WS_URL` ne sont pas définies :
 
-- `createMockHomelabRepository()`
-- `createMockHomelabRealtimeTransport()`
+- sur `127.0.0.1:5173` ou `127.0.0.1:4173`, le frontend cible automatiquement `127.0.0.1:3000`
+- sur une origine non standard, il réutilise l’origine courante pour l’API et `/live` pour le WebSocket
 
-Dans ce mode :
-
-- les écrans restent navigables
-- les données viennent des fixtures mock
-- les actions n’appellent aucune API réelle
-
-Commande :
-
-```bash
-npm run dev
-```
+Le frontend ne bascule plus automatiquement sur des données mock.
 
 ## Variables d’environnement
 
@@ -69,6 +59,9 @@ npm run dev
 - `VITE_WS_URL`
   - exemple local : `ws://127.0.0.1:3000/live`
   - en production conteneurisée, l’image est buildée avec `/live`
+- `VITE_ALLOW_MOCKS`
+  - réservé aux tests et au développement explicitement demandé
+  - exemple : `VITE_ALLOW_MOCKS=true npm run dev`
 
 Si `VITE_WS_URL` commence par `/`, le frontend reconstruit automatiquement une URL `ws://` ou `wss://` à partir de l’origine courante.
 
@@ -104,7 +97,7 @@ Le setup Playwright démarre automatiquement un serveur Vite sur `http://127.0.0
 
 Important :
 
-- les E2E actuels tournent contre le mode mock du frontend
+- les E2E activent explicitement `VITE_ALLOW_MOCKS=true`
 - ils ne valident pas un backend réel
 
 ## Scripts npm
