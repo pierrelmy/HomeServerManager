@@ -2,122 +2,73 @@
 
 ## Objectif
 
-Ce document explique comment tester `SYSTEM_ADAPTER=local` dans une VM Ubuntu lancee avec UTM sur un Mac, sans dependre de ta machine hote.
+Ce guide decrit le workflow de test le plus simple pour ton cas :
 
-Le but n'est pas de reproduire toute la production. Le but est de valider que :
+- tu developpes sur ton Mac
+- tu pushes sur la branche `dev`
+- la VM Ubuntu fait un `git fetch` + `git reset --hard origin/dev`
+- la VM rebuild backend + frontend
+- la VM restart les services
 
-- le backend demarre bien avec `SYSTEM_ADAPTER=local`
-- les commandes systeme appelees par l'adaptateur fonctionnent
-- les pages du frontend s'alimentent depuis le backend reel
-- les actions admin (`systemctl`, Docker, tools, terminal) marchent dans une VM Linux preparee
+Ce guide remplace l'ancien flux base sur `rsync`. Pour des tests repetes, le repo doit etre clone dans la VM et la VM ne doit pas porter de modifications Git locales.
+
+L'IP utilisee dans les exemples est :
+
+```text
+192.168.64.6
+```
 
 ## Ce que tu vas obtenir
 
 A la fin, tu auras :
 
 - une VM Ubuntu dans UTM
-- un backend HomeServerManager qui tourne dedans
-- `SYSTEM_ADAPTER=local` actif
-- au moins un vrai service `systemd` testable
-- Docker accessible au backend
-- les scripts `nas-status` et `scan-network` installes
-- un frontend local sur ton Mac qui pilote la VM Ubuntu
-
-## Limites connues
-
-Ce guide est fait pour une VM de test, pas pour la prod.
-
-En particulier :
-
-- le script NAS fourni suppose un environnement Linux et idealement ZFS
-- si tu n'as pas ZFS dans la VM, on utilisera un script NAS de test compatible avec le contrat attendu
-- Caddy, GHCR, le workflow GitHub de deploiement et Prometheus ne sont pas necessaires pour ce test
+- un checkout Git dans `/srv/homeservermanager-dev`
+- une branche locale `dev` suivie depuis `origin/dev`
+- un backend `SYSTEM_ADAPTER=local` sur le port `3000`
+- un frontend build puis servi en preview sur le port `4173`
+- un script unique `update-hsm-dev.sh` pour mettre a jour la VM
 
 ## Prerequis
 
 Sur ton Mac :
 
-- UTM installe
-- une image Ubuntu Server ou Ubuntu Desktop recente
-- le repo HomeServerManager disponible localement
-- Node.js 24 sur ton Mac si tu veux lancer le frontend en local
+- le repo HomeServerManager
+- un acces `git push origin dev`
 
-Dans la VM cible :
+Dans la VM :
 
-- Ubuntu 24.04 LTS de preference
+- Ubuntu 24.04 LTS
+- acces reseau depuis ton Mac
+- `git`, `node`, `npm`, `docker`, `systemd`
 
-## Vue d'ensemble du setup
+## Architecture retenue
 
-Architecture recommandee pour le test :
+Dans ce guide :
 
-1. Le backend tourne dans la VM Ubuntu
-2. Le frontend tourne sur ton Mac
-3. Le backend de la VM est expose sur ton Mac via un tunnel SSH local
-4. Le frontend parle donc a `127.0.0.1:3000`
-5. Le backend pilote Docker et `systemd` a l'interieur de la VM
+- backend dans la VM : `http://192.168.64.6:3000`
+- frontend dans la VM : `http://192.168.64.6:4173`
+- navigateur sur ton Mac : `http://192.168.64.6:4173`
 
-Pourquoi ce choix :
+Ce choix evite les problemes de cookies et les melanges `localhost` / IP de VM.
 
-- l'auth du projet repose sur un cookie HTTP signe
-- en developpement, ce cookie est emis avec `SameSite=Strict`
-- si le frontend tourne sur `127.0.0.1:5173` mais que l'API est appelee sur l'IP de la VM, par exemple `192.168.64.6:3000`, le navigateur considerera que ce n'est pas le meme site
-- resultat : le login peut reussir cote backend, mais la session ne sera pas renvoyee correctement et tu ne seras pas redirige
+## Etape 1 - Preparer Ubuntu
 
-Conclusion :
-
-- pour tester simplement depuis ton Mac, il faut presenter aussi le backend en `127.0.0.1`
-- le moyen le plus simple est un tunnel SSH local
-
-Dans ton cas, l'IP actuelle de la VM est :
-
-```text
-192.168.64.6
-```
-
-## Etape 1 - Creer la VM UTM
-
-Dans UTM :
-
-1. Creer une nouvelle VM Linux
-2. Choisir Ubuntu
-3. Allouer au moins :
-   - 4 Go de RAM
-   - 2 vCPU
-   - 30 Go de disque
-4. Activer le reseau en mode qui permet a ton Mac de joindre la VM
-
-Le plus simple pour ce test est d'avoir une VM avec une IP joignable depuis macOS.
-
-Une fois Ubuntu installe :
-
-```bash
-ip addr
-```
-
-Note l'IP de la VM, elle sera utilisee pour le SSH et le tunnel local. Exemple :
-
-```text
-192.168.64.6
-```
-
-## Etape 2 - Installer les prerequis Ubuntu
-
-Connecte-toi a la VM puis installe les paquets de base :
+Installe les paquets de base :
 
 ```bash
 sudo apt update
 sudo apt install -y \
   curl \
-  wget \
+  git \
   rsync \
   sudo \
-  git \
   build-essential \
   iproute2 \
   util-linux
 ```
 
-Installer Node.js 24 :
+Installe Node.js 24 :
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
@@ -126,20 +77,15 @@ node -v
 npm -v
 ```
 
-## Etape 3 - Installer Docker dans la VM
-
-Installer Docker :
+Installe Docker :
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo systemctl enable --now docker
 docker --version
-sudo docker ps
 ```
 
-## Etape 4 - Creer l'utilisateur de service
-
-Le backend de production attend un utilisateur `homelab`.
+## Etape 2 - Creer l'utilisateur de service
 
 ```bash
 sudo useradd --create-home --shell /bin/bash homelab
@@ -147,93 +93,61 @@ sudo usermod -aG docker homelab
 id homelab
 ```
 
-## Etape 5 - Preparer l'arborescence cible
+## Etape 3 - Preparer les repertoires
 
 ```bash
-sudo mkdir -p /opt/homeservermanager/backend
-sudo mkdir -p /opt/homeservermanager/deploy
+sudo mkdir -p /srv/homeservermanager-dev
 sudo mkdir -p /var/lib/homeservermanager
 sudo mkdir -p /etc/homeservermanager
 sudo mkdir -p /usr/local/libexec/homeservermanager
-sudo chown -R homelab:homelab /opt/homeservermanager
+sudo chown -R ubuntu:ubuntu /srv/homeservermanager-dev
 sudo chown -R homelab:homelab /var/lib/homeservermanager
 ```
 
-## Etape 6 - Copier le projet dans la VM
-
-Depuis ton Mac, adapte le chemin local du repo puis copie le contenu utile dans la VM :
-
-```bash
-rsync -az \
-  --delete \
-  /Users/pierre/delivery/hub/home-server-2/backend/ \
-  ubuntu@192.168.64.6:/tmp/homeservermanager-backend/
-
-rsync -az \
-  --delete \
-  /Users/pierre/delivery/hub/home-server-2/deploy/ \
-  ubuntu@192.168.64.6:/tmp/homeservermanager-deploy/
-```
+## Etape 4 - Cloner le repo dans la VM
 
 Dans la VM :
 
 ```bash
-sudo rsync -az --delete /tmp/homeservermanager-backend/ /opt/homeservermanager/backend/
-sudo rsync -az --delete /tmp/homeservermanager-deploy/ /opt/homeservermanager/deploy/
-sudo chown -R homelab:homelab /opt/homeservermanager/backend
-sudo chown -R homelab:homelab /opt/homeservermanager/deploy
+cd /srv/homeservermanager-dev
+git clone https://github.com/pierrelmy/HomeServerManager.git .
+git fetch origin
+git switch -c dev --track origin/dev
 ```
 
-## Etape 7 - Builder le backend dans la VM
-
-Dans la VM :
+Verification :
 
 ```bash
-cd /opt/homeservermanager/backend
-sudo -u homelab npm ci --no-audit --no-fund
-sudo -u homelab npm run build
-sudo -u homelab npm ci --omit=dev --no-audit --no-fund
+git branch --show-current
 ```
 
-## Etape 8 - Installer le service systemd
+Tu dois voir :
 
-```bash
-sudo cp /opt/homeservermanager/deploy/homelab-backend.service /etc/systemd/system/homeservermanager.service
-sudo systemctl daemon-reload
+```text
+dev
 ```
 
-## Etape 9 - Installer le sudoers
-
-Copier le fichier fourni :
+## Etape 5 - Installer les dependances une premiere fois
 
 ```bash
-sudo cp /opt/homeservermanager/deploy/homelab-sudoers /etc/sudoers.d/homeservermanager
-sudo chmod 0440 /etc/sudoers.d/homeservermanager
-sudo visudo -cf /etc/sudoers.d/homeservermanager
+cd /srv/homeservermanager-dev/backend
+npm ci --no-audit --no-fund
+
+cd /srv/homeservermanager-dev/frontend
+npm ci --no-audit --no-fund
 ```
 
-Important :
+## Etape 6 - Installer les scripts systeme
 
-- ce fichier est un exemple
-- il doit rester aligne avec `SYSTEM_SERVICE_MAP` et `NAS_SCRUB_COMMAND`
-
-## Etape 10 - Installer les scripts systeme
-
-### 10.1 Script scan reseau
-
-Le script fourni peut etre installe tel quel :
+### 6.1 Scan reseau
 
 ```bash
-sudo cp /opt/homeservermanager/deploy/scripts/scan-network.mjs /usr/local/libexec/homeservermanager/scan-network
+sudo cp /srv/homeservermanager-dev/deploy/scripts/scan-network.mjs /usr/local/libexec/homeservermanager/scan-network
 sudo chmod 0755 /usr/local/libexec/homeservermanager/scan-network
 sudo chown root:root /usr/local/libexec/homeservermanager/scan-network
 ```
 
-### 10.2 Script NAS pour une VM de test
-
-Le script NAS fourni suppose un environnement plus proche de la prod. Pour une VM Ubuntu de test, le plus simple est d'installer un script de remplacement compatible avec le contrat attendu.
-
-Creer ce fichier dans la VM :
+### 6.2 Script NAS de test
 
 ```bash
 sudo tee /usr/local/libexec/homeservermanager/nas-status >/dev/null <<'EOF'
@@ -256,11 +170,7 @@ sudo chmod 0755 /usr/local/libexec/homeservermanager/nas-status
 sudo chown root:root /usr/local/libexec/homeservermanager/nas-status
 ```
 
-## Etape 11 - Installer un vrai service systemd testable
-
-Pour valider `actOnService(...)`, il te faut au moins un service gerable. Le plus simple est de creer un faux service long-courant.
-
-Creer un script :
+## Etape 7 - Installer un service `systemd` testable
 
 ```bash
 sudo tee /usr/local/bin/homelab-demo-service.sh >/dev/null <<'EOF'
@@ -271,8 +181,6 @@ done
 EOF
 sudo chmod 0755 /usr/local/bin/homelab-demo-service.sh
 ```
-
-Creer l'unite systemd :
 
 ```bash
 sudo tee /etc/systemd/system/homelab-demo.service >/dev/null <<'EOF'
@@ -289,37 +197,22 @@ WantedBy=multi-user.target
 EOF
 ```
 
-Activer l'unite :
-
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now homelab-demo.service
 systemctl is-active homelab-demo.service
 ```
 
-## Etape 12 - Adapter la config backend pour la VM
+## Etape 8 - Configurer le backend
 
-Creer le fichier d'environnement :
-
-```bash
-sudo cp /opt/homeservermanager/deploy/backend.env.example /etc/homeservermanager/backend.env
-sudo chmod 0600 /etc/homeservermanager/backend.env
-```
-
-Edite ensuite le fichier :
-
-```bash
-sudo nano /etc/homeservermanager/backend.env
-```
-
-Contenu recommande pour la VM de test :
+Cree le fichier `/srv/homeservermanager-dev/backend/.env` :
 
 ```dotenv
 HOST=0.0.0.0
 PORT=3000
 NODE_ENV=development
 SESSION_SECRET=change-this-session-secret-for-vm-123456
-CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+CORS_ORIGINS=http://192.168.64.6:4173
 LOG_LEVEL=debug
 READ_AUTH_REQUIRED=false
 METRICS_INTERVAL_MS=5000
@@ -335,16 +228,29 @@ NAS_STATUS_COMMAND=["/usr/local/libexec/homeservermanager/nas-status"]
 TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"]}
 ```
 
-Notes :
+## Etape 9 - Configurer le frontend
 
-- `NODE_ENV=development` est volontaire ici pour garder un comportement de test local souple
-- `SYSTEM_ADAPTER=local` est bien actif
-- `demo-service` te permet de tester `start/stop/restart` sans avoir Ollama ou Jenkins
-- `NAS_SCRUB_COMMAND=["/usr/bin/true"]` evite d'exiger ZFS dans la VM
+Cree le fichier `/srv/homeservermanager-dev/frontend/.env` :
 
-## Etape 13 - Etendre le sudoers pour le service de test
+```dotenv
+VITE_API_BASE_URL=http://192.168.64.6:3000
+VITE_WS_URL=ws://192.168.64.6:3000/live
+```
 
-Le fichier fourni ne connait pas `homelab-demo.service`. Ajoute-le a la main :
+Important :
+
+- ces deux fichiers `.env` restent sur la VM
+- ils ne doivent pas etre commits
+- le frontend est build avec ces variables puis servi statiquement
+
+## Etape 10 - Installer le `sudoers`
+
+```bash
+sudo cp /srv/homeservermanager-dev/deploy/homelab-sudoers /etc/sudoers.d/homeservermanager
+sudo chmod 0440 /etc/sudoers.d/homeservermanager
+```
+
+Ajoute les droits pour le service de demo :
 
 ```bash
 sudo tee -a /etc/sudoers.d/homeservermanager >/dev/null <<'EOF'
@@ -355,9 +261,46 @@ EOF
 sudo visudo -cf /etc/sudoers.d/homeservermanager
 ```
 
-## Etape 14 - Tester les prerequis a la main
+## Etape 11 - Installer les services systemd de dev
 
-Avant de lancer le backend, teste exactement ce que l'adaptateur appellera :
+```bash
+sudo cp /srv/homeservermanager-dev/deploy/homelab-backend-dev.service /etc/systemd/system/homeservermanager-backend-dev.service
+sudo cp /srv/homeservermanager-dev/deploy/homelab-frontend-dev.service /etc/systemd/system/homeservermanager-frontend-dev.service
+sudo systemctl daemon-reload
+```
+
+## Etape 12 - Installer le script de mise a jour
+
+```bash
+sudo cp /srv/homeservermanager-dev/deploy/update-hsm-dev.sh /usr/local/bin/update-hsm-dev.sh
+sudo chmod 0755 /usr/local/bin/update-hsm-dev.sh
+```
+
+Le script fait :
+
+- `git fetch origin`
+- `git switch dev`
+- `git reset --hard origin/dev`
+- `npm ci` + `npm run build` backend
+- `npm ci` + `npm run build` frontend
+- restart backend + frontend
+
+## Etape 13 - Premier build + premier demarrage
+
+```bash
+cd /srv/homeservermanager-dev/backend
+npm run build
+
+cd /srv/homeservermanager-dev/frontend
+npm run build
+
+sudo systemctl enable --now homeservermanager-backend-dev
+sudo systemctl enable --now homeservermanager-frontend-dev
+sudo systemctl status homeservermanager-backend-dev --no-pager
+sudo systemctl status homeservermanager-frontend-dev --no-pager
+```
+
+## Etape 14 - Verifier les prerequis a la main
 
 ```bash
 sudo -u homelab docker ps
@@ -367,170 +310,21 @@ sudo -u homelab /usr/local/libexec/homeservermanager/nas-status
 sudo -u homelab /usr/local/libexec/homeservermanager/scan-network
 ```
 
-Tous ces tests doivent fonctionner sans prompt interactif.
+## Etape 15 - Verifier les endpoints
 
-## Etape 15 - Demarrer le backend
-
-```bash
-sudo systemctl enable --now homeservermanager
-sudo systemctl status homeservermanager
-journalctl -u homeservermanager -n 100 --no-pager
-```
-
-Verifier les endpoints :
+Dans la VM :
 
 ```bash
 curl http://127.0.0.1:3000/health
 curl http://127.0.0.1:3000/ready
 curl http://127.0.0.1:3000/session
+curl http://127.0.0.1:4173
 ```
-
-## Etape 16 - Lancer le frontend sur ton Mac
-
-### 16.1 Ouvrir un tunnel SSH entre ton Mac et la VM
-
-Sur ton Mac :
-
-```bash
-ssh -L 3000:127.0.0.1:3000 ubuntu@192.168.64.6
-```
-
-Laisse cette session ouverte.
-
-Ce tunnel signifie :
-
-- `http://127.0.0.1:3000` sur ton Mac pointe vers `http://127.0.0.1:3000` dans la VM
-- pour le navigateur, frontend et backend sont alors servis sur le meme host `127.0.0.1`
-- la session cookie fonctionne correctement en local
-
-Teste le tunnel depuis ton Mac :
-
-```bash
-curl http://127.0.0.1:3000/health
-curl http://127.0.0.1:3000/session
-```
-
-### 16.2 Lancer le frontend sur ton Mac
-
-Sur ton Mac, dans le repo :
-
-```bash
-cd frontend
-npm ci
-VITE_API_BASE_URL=http://127.0.0.1:3000 \
-VITE_WS_URL=ws://127.0.0.1:3000/live \
-npm run dev
-```
-
-Ouvre ensuite :
-
-```text
-http://127.0.0.1:5173
-```
-
-Connexion recommandee :
-
-- email : `admin@localhost.test`
-- mot de passe : `development-password`
-
-## Etape 17 - Verifications dans l'UI
-
-Une fois connecte :
-
-1. Verifier que la page Account montre bien ton utilisateur backend
-2. Aller dans Services
-3. Verifier qu'un service `demo-service` apparait si tes seeds / donnees le referencent
-4. Aller dans Terminal
-5. Tester :
-   - `uptime`
-   - `docker ps`
-   - `df -h`
-   - `journalctl -p err -n 5`
-6. Aller dans Tools
-7. Lancer `scan-reseau`
-
-## Variante - Lancer aussi le frontend dans la VM
-
-Si tu preferes tester un setup entierement dans la VM, cette variante est souvent plus simple pour l'authentification.
-
-Dans ce mode :
-
-- backend dans la VM
-- frontend dans la VM
-- navigateur sur ton Mac
-- frontend ouvert sur `http://192.168.64.6:5173`
-- backend appele sur `http://192.168.64.6:3000`
-
-Avantages :
-
-- pas de tunnel SSH
-- pas de confusion entre `127.0.0.1`, `localhost` et l'IP de la VM
-- comportement plus proche d'un vrai deploiement reseau
-
-### Variante A - Copier le frontend dans la VM
 
 Depuis ton Mac :
 
-```bash
-rsync -az \
-  --delete \
-  /Users/pierre/delivery/hub/home-server-2/frontend/ \
-  ubuntu@192.168.64.6:/tmp/homeservermanager-frontend/
-```
-
-Dans la VM :
-
-```bash
-sudo mkdir -p /opt/homeservermanager/frontend
-sudo rsync -az --delete /tmp/homeservermanager-frontend/ /opt/homeservermanager/frontend/
-sudo chown -R homelab:homelab /opt/homeservermanager/frontend
-cd /opt/homeservermanager/frontend
-sudo -u homelab npm ci --no-audit --no-fund
-```
-
-### Variante B - Adapter `CORS_ORIGINS`
-
-Dans `/etc/homeservermanager/backend.env`, remplace `CORS_ORIGINS` par :
-
-```dotenv
-CORS_ORIGINS=http://192.168.64.6:5173
-```
-
-Puis redemarre le backend :
-
-```bash
-sudo systemctl restart homeservermanager
-sudo systemctl status homeservermanager
-```
-
-### Variante C - Lancer le frontend dans la VM
-
-Dans la VM :
-
-```bash
-cd /opt/homeservermanager/frontend
-sudo -u homelab env \
-  VITE_API_BASE_URL=http://192.168.64.6:3000 \
-  VITE_WS_URL=ws://192.168.64.6:3000/live \
-  npm run dev -- --host 0.0.0.0 --port 5173
-```
-
-### Variante D - Verifier localement dans la VM
-
-Dans la VM :
-
-```bash
-curl http://127.0.0.1:3000/health
-curl http://127.0.0.1:3000/session
-curl http://127.0.0.1:5173
-```
-
-### Variante E - Ouvrir l'application depuis le Mac
-
-Depuis ton Mac, ouvre :
-
 ```text
-http://192.168.64.6:5173
+http://192.168.64.6:4173
 ```
 
 Connexion recommandee :
@@ -538,111 +332,110 @@ Connexion recommandee :
 - email : `admin@localhost.test`
 - mot de passe : `development-password`
 
-### Variante F - Regle de cohérence
+## Workflow quotidien
 
-Dans ce mode, il faut garder les deux URLs sur l'IP de la VM :
+Sur le Mac :
 
-- frontend : `http://192.168.64.6:5173`
-- backend : `http://192.168.64.6:3000`
-
-Ne pas melanger :
-
-- frontend sur l'IP de la VM
-- backend sur `127.0.0.1`
-
-ou l'inverse.
-
-## Variante - Ne pas utiliser de tunnel SSH
-
-Si tu ne veux pas de tunnel SSH, il faut alors executer aussi le frontend dans la VM ou servir frontend et backend derriere la meme origine HTTP(S).
-
-Ce qu'il ne faut pas faire pour ce projet en dev HTTP classique :
-
-- frontend sur `http://127.0.0.1:5173`
-- backend sur `http://192.168.64.6:3000`
-
-Dans ce cas, le login backend peut repondre `200`, mais la session ne sera pas exploitable correctement par le navigateur a cause de la politique de cookie.
-
-## Etape 18 - Si `demo-service` n'apparait pas dans la page Services
-
-Dans l'etat actuel du projet, les services affiches viennent des donnees persistees / seedees du backend. Si ton `SYSTEM_SERVICE_MAP` contient `demo-service` mais que l'UI ne l'affiche pas, c'est que les donnees backend ne referencent pas encore ce service.
-
-Dans ce cas, tu as deux options :
-
-1. Remplacer un service seed existant dans `SYSTEM_SERVICE_MAP`
-   - par exemple mapper `jenkins` vers `homelab-demo.service`
-2. Ou faire evoluer les seeds backend pour declarer explicitement `demo-service`
-
-La solution la plus rapide pour un test est souvent :
-
-```dotenv
-SYSTEM_SERVICE_MAP={"jenkins":"homelab-demo.service","docker-engine":"docker.service"}
+```bash
+git switch dev
+git add .
+git commit -m "ton changement"
+git push origin dev
 ```
 
-## Etape 19 - Diagnostic rapide en cas d'echec
+Sur la VM :
+
+```bash
+sudo /usr/local/bin/update-hsm-dev.sh
+```
+
+## Verification rapide que la VM tourne bien sur le bon code
+
+Dans la VM :
+
+```bash
+cd /srv/homeservermanager-dev
+git branch --show-current
+git rev-parse HEAD
+git rev-parse origin/dev
+```
+
+Les deux SHA doivent etre identiques apres `update-hsm-dev.sh`.
+
+Pour verifier que la VM contient bien les correctifs recents :
+
+```bash
+rg "MemAvailable|collectDiskInfo|configureLocalTargets" \
+  /srv/homeservermanager-dev/backend/src \
+  /srv/homeservermanager-dev/backend/dist
+```
+
+## Diagnostic rapide
+
+### Le script `update-hsm-dev.sh` echoue
+
+Verifier :
+
+```bash
+cd /srv/homeservermanager-dev
+git status
+git branch --show-current
+```
+
+La VM doit rester propre :
+
+- pas de modifications locales dans les fichiers versionnes
+- pas de commits locaux sur la VM
+- branche courante `dev`
 
 ### Le backend ne demarre pas
 
-Verifier :
-
 ```bash
-journalctl -u homeservermanager -n 200 --no-pager
+journalctl -u homeservermanager-backend-dev -n 200 --no-pager
 ```
 
-Ca pointe generalement vers :
-
-- une variable mal formee dans `backend.env`
-- un script manquant
-- un binaire absent
-- un `sudoers` incomplet
-
-### `/ready` retourne `503`
-
-Ca signifie que l'adaptateur systeme n'est pas pret.
-
-Verifier :
+### Le frontend ne demarre pas
 
 ```bash
-sudo -u homelab /usr/local/libexec/homeservermanager/nas-status
-sudo -u homelab docker ps
-systemctl is-active docker.service
+journalctl -u homeservermanager-frontend-dev -n 200 --no-pager
 ```
 
-### Le login marche mais pas les actions systeme
+### Le login marche mais rien ne se passe dans l'UI
 
-Verifier :
+Verifier les URLs :
+
+- frontend : `http://192.168.64.6:4173`
+- backend : `http://192.168.64.6:3000`
+
+Et verifier les `.env` :
 
 ```bash
-sudo -u homelab sudo -n systemctl restart homelab-demo.service
-sudo -u homelab docker ps
+cat /srv/homeservermanager-dev/backend/.env
+cat /srv/homeservermanager-dev/frontend/.env
 ```
 
-Si l'une de ces commandes echoue, le probleme est sur la VM, pas dans le frontend.
+### Les stats ou les disques semblent faux
 
-### Le frontend affiche encore des donnees “mock”
-
-Le frontend n'est pas forcement en mode mock. En revanche, le backend en mode `simulation` ou ses seeds SQLite peuvent ressembler visuellement aux mocks.
-
-Pour ce guide :
-
-- assure-toi que `SYSTEM_ADAPTER=local`
-- verifie le backend avec :
+Verifier d'abord que la VM tourne sur le dernier code :
 
 ```bash
-grep SYSTEM_ADAPTER /etc/homeservermanager/backend.env
-curl http://127.0.0.1:3000/session
+cd /srv/homeservermanager-dev
+git rev-parse HEAD
+git rev-parse origin/dev
 ```
 
-## Etape 20 - Etendre ensuite vers un test plus realiste
+Puis comparer :
 
-Une fois ce setup valide, tu peux rendre la VM plus proche de la prod :
+```bash
+free -h
+df -h
+curl http://127.0.0.1:3000/overview
+```
 
-- installer Ollama et le mapper a `ollama.service`
-- installer Jenkins et le mapper a `jenkins.service`
-- remplacer le faux script NAS par un vrai script ZFS/SMART
-- activer `READ_AUTH_REQUIRED=true`
-- mettre `NODE_ENV=production`
-- exposer ensuite Caddy + frontend conteneurise
+Le backend local recent :
+
+- lit la RAM depuis `/proc/meminfo` avec `MemAvailable`
+- lit les disques via `df`
 
 ## References
 
