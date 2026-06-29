@@ -2,6 +2,7 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { hostname, uptime as osUptime } from "node:os"
 import type { DiskInfo, DockerSnapshot, MetricSparkline, NasSnapshot, OverviewSnapshot, ServiceRecord, ServiceStatus } from "../shared/contracts.js"
+import { badRequest } from "../shared/errors.js"
 
 const execFileAsync = promisify(execFile)
 
@@ -56,7 +57,7 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   async actOnService(id: string, action: "start" | "stop" | "restart") {
     const unit = this.options.serviceMap[id]
-    if (!unit) throw new Error(`Service system mapping is missing for ${id}`)
+    if (!unit) throw badRequest(`Service system mapping is missing for ${id}`)
     await this.execute("sudo", ["-n", "systemctl", action, unit])
   }
 
@@ -156,17 +157,27 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   private async executeConfigured(command: string[], label: string): Promise<string[]> {
     const [executable, ...args] = command
-    if (!executable) throw new Error(`Command mapping is missing for ${label}`)
+    if (!executable) throw badRequest(`Command mapping is missing for ${label}`)
     return this.execute(executable, args)
   }
 
   private async execute(executable: string, args: string[]): Promise<string[]> {
-    const { stdout, stderr } = await execFileAsync(executable, args, {
-      timeout: this.timeoutMs,
-      maxBuffer: 1_024 * 1_024,
-      windowsHide: true,
-    })
-    return `${stdout}${stderr}`.trim().split("\n").filter(Boolean)
+    try {
+      const { stdout, stderr } = await execFileAsync(executable, args, {
+        timeout: this.timeoutMs,
+        maxBuffer: 1_024 * 1_024,
+        windowsHide: true,
+      })
+      return `${stdout}${stderr}`.trim().split("\n").filter(Boolean)
+    } catch (error) {
+      if (error instanceof Error && "stderr" in error) {
+        const stderr = String((error as { stderr?: string }).stderr ?? "").trim()
+        const stdout = String((error as { stdout?: string }).stdout ?? "").trim()
+        const details = stderr || stdout || error.message
+        throw badRequest(details)
+      }
+      throw error
+    }
   }
 
   private async getServiceStatus(id: string): Promise<ServiceStatus> {

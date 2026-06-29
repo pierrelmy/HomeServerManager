@@ -210,6 +210,29 @@ describe("homelab API", () => {
     expect(limited.statusCode).toBe(429)
   })
 
+  it("returns a client error when a local service command fails", async () => {
+    built = await buildApp({
+      ...config,
+      systemAdapter: "local",
+      systemServiceMap: '{"demo-service":"homelab-demo.service"}',
+      nasScrubCommand: '["/usr/bin/true"]',
+      nasStatusCommand: '["/usr/bin/printf","{\\"capacityUsed\\":\\"20 Go / 100 Go\\",\\"healthSummary\\":\\"OK\\",\\"backupSummary\\":\\"N/A\\",\\"temperatureSummary\\":\\"N/A\\",\\"pools\\":[],\\"backups\\":[],\\"drives\\":[]}"]',
+      toolCommands: '{}',
+    })
+    built.repository.saveService({
+      id: "demo-service",
+      label: "Demo Service",
+      desc: "Service de test",
+      location: "homelab-demo.service",
+      status: "stopped",
+      logs: [],
+    })
+    const cookie = await login(built)
+    const response = await built.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toMatchObject({ error: "BAD_REQUEST" })
+  })
+
   it("protects and exposes Prometheus metrics", async () => {
     const instance = await setup()
     const denied = await instance.app.inject({ method: "GET", url: "/metrics" })

@@ -9,4 +9,7 @@ homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart jenkins.service
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start docker.service
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop docker.service
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart docker.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start homelab-demo.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop homelab-demo.service
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart homelab-demo.service
 homelab ALL=(root) NOPASSWD: /usr/sbin/zpool scrub pool-data
