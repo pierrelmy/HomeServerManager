@@ -45,6 +45,19 @@ export interface BuiltApp {
   service: HomelabService
 }
 
+function isAllowedOrigin(origin: string | undefined, config: AppConfig): boolean {
+  if (!origin) return true
+  if (config.corsOrigins.includes(origin)) return true
+  if (config.nodeEnv === "production") return false
+
+  try {
+    const parsed = new URL(origin)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 export async function buildApp(config: AppConfig, dependencies: AppDependencies = {}): Promise<BuiltApp> {
   const app = Fastify({
     logger: config.nodeEnv === "test" ? false : { level: config.logLevel },
@@ -57,23 +70,29 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     adminEmail: config.adminEmail,
     adminPassword: config.adminPassword,
     adminDisplayName: config.adminDisplayName,
+    syncAdminOnBoot: config.nodeEnv !== "production",
   })
   const events = dependencies.events ?? new EventHub()
+  const serviceMap = parseStringMap(config.systemServiceMap, "SYSTEM_SERVICE_MAP")
+  const nasScrubCommand = parseCommand(config.nasScrubCommand, "NAS_SCRUB_COMMAND")
+  const nasStatusCommand = parseCommand(config.nasStatusCommand, "NAS_STATUS_COMMAND")
+  const toolCommands = parseCommandMap(config.toolCommands, "TOOL_COMMANDS")
   const system = config.systemAdapter === "local"
     ? new LocalSystemAdapter({
-        serviceMap: parseStringMap(config.systemServiceMap, "SYSTEM_SERVICE_MAP"),
-        nasScrubCommand: parseCommand(config.nasScrubCommand, "NAS_SCRUB_COMMAND"),
-        nasStatusCommand: parseCommand(config.nasStatusCommand, "NAS_STATUS_COMMAND"),
-        toolCommands: parseCommandMap(config.toolCommands, "TOOL_COMMANDS"),
+        serviceMap,
+        nasScrubCommand,
+        nasStatusCommand,
+        toolCommands,
       })
     : new SimulationSystemAdapter()
   const service = new HomelabService(repository, events, system)
+  service.configureLocalTargets(serviceMap, toolCommands)
 
   await app.register(cookie, { secret: config.sessionSecret, hook: "onRequest" })
   await app.register(cors, {
     credentials: true,
     origin(origin, callback) {
-      callback(null, !origin || config.corsOrigins.includes(origin))
+      callback(null, isAllowedOrigin(origin, config))
     },
   })
   await app.register(rateLimit, { global: true, max: 100, timeWindow: "1 minute" })
@@ -119,7 +138,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   app.addHook("onRequest", async (request) => {
     if (["GET", "HEAD", "OPTIONS"].includes(request.method) || request.url === "/session") return
     const origin = request.headers.origin
-    if (origin && !config.corsOrigins.includes(origin)) throw forbidden("Request origin is not allowed")
+    if (!isAllowedOrigin(origin, config)) throw forbidden("Request origin is not allowed")
   })
 
   app.setErrorHandler((error, request, reply) => {
@@ -290,7 +309,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
 
   app.get("/live", { websocket: true, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, (socket, request) => {
     const origin = request.headers.origin
-    if (origin && !config.corsOrigins.includes(origin)) {
+    if (!isAllowedOrigin(origin, config)) {
       socket.close(1008, "Origin is not allowed")
       return
     }

@@ -1,6 +1,6 @@
 // pages/Login.tsx
 import { useState } from "react"
-import { Form, Button, Card, Alert } from "react-bootstrap"
+import { Form, Button, Card, Alert, InputGroup } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import { useAuthSession } from "../hooks/useAuthSession"
 
@@ -12,6 +12,7 @@ export default function Login()
   const [loginError, setLoginError] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = async () => {
     setSubmitting(true)
@@ -49,7 +50,24 @@ export default function Login()
 
           <Form.Group className="mb-3" controlId="password">
             <Form.Label className="small fw-medium">Mot de passe</Form.Label>
-            <Form.Control type="password" placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" />
+            <InputGroup>
+              <Form.Control
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <Button
+                type="button"
+                variant="outline-secondary"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              >
+                {showPassword ? "Masquer" : "Afficher"}
+              </Button>
+            </InputGroup>
           </Form.Group>
 
           <Button type="submit" variant="primary" className="w-100" disabled={submitting}>

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { hostname, loadavg, totalmem, freemem, uptime } from "node:os"
+import { hostname, loadavg, uptime } from "node:os"
 import type { EventHub } from "../events/event-hub.js"
 import type { HomelabRepository } from "../repositories/homelab-repository.js"
 import type {
@@ -31,6 +31,54 @@ function systemUptime(): number {
   }
 }
 
+const knownServiceMetadata: Record<string, { label: string; desc: string }> = {
+  ollama: { label: "Ollama", desc: "Service LLM local" },
+  jenkins: { label: "Jenkins", desc: "Intégration continue" },
+  "docker-engine": { label: "Docker Engine", desc: "Moteur de conteneurs" },
+  "demo-service": { label: "Demo Service", desc: "Service systemd de test" },
+}
+
+const knownToolMetadata: Record<string, { title: string; description: string; tag: string }> = {
+  "scan-reseau": {
+    title: "Scan réseau",
+    description: "Détecte les hôtes visibles et regroupe les ports courants.",
+    tag: "Réseau",
+  },
+  "audit-docker": {
+    title: "Audit Docker",
+    description: "Passe en revue les conteneurs, images inutilisées et volumes orphelins.",
+    tag: "Conteneurs",
+  },
+  "export-logs": {
+    title: "Export logs",
+    description: "Récupère un paquet de logs pour dépannage ou archivage.",
+    tag: "Support",
+  },
+  "verif-sauvegardes": {
+    title: "Vérif. sauvegardes",
+    description: "Compare les dernières archives avec les checksums attendus.",
+    tag: "Backups",
+  },
+  "refresh-index": {
+    title: "Refresh index",
+    description: "Reconstruit les métadonnées visibles dans le tableau de bord.",
+    tag: "Index",
+  },
+  "rapport-sante": {
+    title: "Rapport santé",
+    description: "Compile un état synthétique des alertes et des tendances.",
+    tag: "Synthèse",
+  },
+}
+
+function humanizeId(value: string): string {
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
 export class HomelabService {
   constructor(
     private readonly repository: HomelabRepository,
@@ -52,24 +100,50 @@ export class HomelabService {
     }
   }
 
+  configureLocalTargets(serviceMap: Record<string, string>, toolCommands: Record<string, string[]>): void {
+    if (this.system.mode !== "local") return
+
+    const existingServices = new Map(this.repository.listServices().map((service) => [service.id, service]))
+    const nextServices = Object.entries(serviceMap).map(([id, unit]) => {
+      const existing = existingServices.get(id)
+      const metadata = knownServiceMetadata[id]
+      return {
+        id,
+        label: metadata?.label ?? humanizeId(id),
+        desc: metadata?.desc ?? `Service mappé vers ${unit}`,
+        location: unit,
+        status: existing?.status ?? "stopped",
+        logs: existing?.logs ?? [],
+      } satisfies ServiceRecord
+    })
+    this.repository.replaceServices(nextServices)
+
+    const currentTools = this.repository.getTools()
+    const nextTools = {
+      ...currentTools,
+      tools: Object.keys(toolCommands).map((id) => {
+        const metadata = knownToolMetadata[id]
+        return {
+          title: metadata?.title ?? humanizeId(id),
+          description: metadata?.description ?? `Commande locale configurée pour ${id}.`,
+          tag: metadata?.tag ?? "Support",
+        }
+      }),
+    }
+    this.repository.saveTools(nextTools)
+  }
+
   refreshOverview(): void {
     const overview = this.repository.getOverview()
-    const memoryUsed = totalmem() - freemem()
-    const memoryPercent = Math.round((memoryUsed / totalmem()) * 100)
     const cpuPercent = Math.min(100, Math.round((loadavg()[0] ?? 0) * 25))
     const uptimeHours = Math.floor(systemUptime() / 3_600)
     const days = Math.floor(uptimeHours / 24)
     overview.hostName = hostname()
     overview.uptime = `${days}j ${uptimeHours % 24}h`
     const cpu = overview.metrics[0]
-    const memory = overview.metrics[1]
     if (cpu) {
       cpu.value = `${cpuPercent}%`
       cpu.points = [...cpu.points.slice(-23), cpuPercent]
-    }
-    if (memory) {
-      memory.value = `${(memoryUsed / 1024 ** 3).toFixed(1).replace(".", ",")} / ${(totalmem() / 1024 ** 3).toFixed(0)} Go`
-      memory.points = [...memory.points.slice(-23), memoryPercent]
     }
     this.repository.setOverview(overview)
     this.events.broadcast({ type: "overview.updated", overview })
@@ -80,11 +154,16 @@ export class HomelabService {
     if (this.system.mode !== "local") return []
 
     const results = await Promise.allSettled([
+      this.system.collectOverview(this.repository.getOverview()),
       this.system.collectServices(this.repository.listServices()),
       this.system.collectDocker(),
       this.system.collectNas(),
     ])
-    const [servicesResult, dockerResult, nasResult] = results
+    const [overviewResult, servicesResult, dockerResult, nasResult] = results
+    if (overviewResult?.status === "fulfilled" && overviewResult.value) {
+      this.repository.setOverview(overviewResult.value)
+      this.events.broadcast({ type: "overview.updated", overview: overviewResult.value })
+    }
     if (servicesResult?.status === "fulfilled" && servicesResult.value) {
       for (const service of servicesResult.value) this.repository.saveService(service)
       this.events.broadcast({ type: "services.updated", services: servicesResult.value })

@@ -410,6 +410,9 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
       const nextSession = await repository.signIn(email, password)
       session.setState(nextSession)
       await loadAll()
+      if (!session.getSnapshot()?.isAuthenticated) {
+        throw new Error("La session n'a pas pu être persistée dans le navigateur. En développement local, utilisez la même origine pour le frontend et l'API, par exemple 127.0.0.1 des deux côtés.")
+      }
       reconnectRealtime()
       return nextSession
     },

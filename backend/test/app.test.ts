@@ -60,6 +60,36 @@ describe("homelab API", () => {
     }
   })
 
+  it("derives services and tools from local system configuration", async () => {
+    built = await buildApp({
+      ...config,
+      systemAdapter: "local",
+      systemServiceMap: '{"demo-service":"homelab-demo.service","docker-engine":"docker.service"}',
+      nasScrubCommand: '["/usr/bin/true"]',
+      nasStatusCommand: '["/usr/bin/printf","{\\"capacityUsed\\":\\"20 Go / 100 Go\\",\\"healthSummary\\":\\"OK\\",\\"backupSummary\\":\\"N/A\\",\\"temperatureSummary\\":\\"N/A\\",\\"pools\\":[],\\"backups\\":[],\\"drives\\":[]}"]',
+      toolCommands: '{"scan-reseau":["/usr/bin/true"]}',
+    })
+
+    const servicesResponse = await built.app.inject({ method: "GET", url: "/services" })
+    expect(servicesResponse.statusCode).toBe(200)
+    expect(servicesResponse.json()).toEqual([
+      expect.objectContaining({ id: "demo-service", label: "Demo Service", location: "homelab-demo.service" }),
+      expect.objectContaining({ id: "docker-engine", label: "Docker Engine", location: "docker.service" }),
+    ])
+
+    const toolsResponse = await built.app.inject({ method: "GET", url: "/tools" })
+    expect(toolsResponse.statusCode).toBe(200)
+    expect(toolsResponse.json()).toMatchObject({
+      tools: [
+        {
+          title: "Scan réseau",
+          description: "Détecte les hôtes visibles et regroupe les ports courants.",
+          tag: "Réseau",
+        },
+      ],
+    })
+  })
+
   it("creates and removes a signed session", async () => {
     const instance = await setup()
     const cookie = await login(instance)
@@ -68,6 +98,41 @@ describe("homelab API", () => {
 
     const logout = await instance.app.inject({ method: "DELETE", url: "/session", headers: { cookie } })
     expect(logout.json()).toEqual({ isAuthenticated: false, provider: null, displayName: null, email: null, role: null })
+  })
+
+  it("accepts alternate frontend origins in development mode", async () => {
+    const instance = await setup()
+    const response = await instance.app.inject({
+      method: "OPTIONS",
+      url: "/session",
+      headers: {
+        origin: "http://host-001.lan:5173",
+        "access-control-request-method": "POST",
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers["access-control-allow-origin"]).toBe("http://host-001.lan:5173")
+  })
+
+  it("keeps origin checks strict in production", async () => {
+    built = await buildApp({
+      ...config,
+      nodeEnv: "production",
+      corsOrigins: ["https://homelab.example.test"],
+    })
+
+    const response = await built.app.inject({
+      method: "OPTIONS",
+      url: "/session",
+      headers: {
+        origin: "http://host-001.lan:5173",
+        "access-control-request-method": "POST",
+      },
+    })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined()
   })
 
   it("protects mutations and validates settings", async () => {

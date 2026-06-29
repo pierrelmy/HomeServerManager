@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import type { DockerSnapshot, NasSnapshot, ServiceRecord, ServiceStatus } from "../shared/contracts.js"
+import { hostname, uptime as osUptime } from "node:os"
+import type { DiskInfo, DockerSnapshot, MetricSparkline, NasSnapshot, OverviewSnapshot, ServiceRecord, ServiceStatus } from "../shared/contracts.js"
 
 const execFileAsync = promisify(execFile)
 
@@ -17,6 +18,7 @@ export interface SystemAdapter {
   runNasScrub(): Promise<void>
   runTool(id: string): Promise<void>
   executeTerminal(command: string): Promise<CommandResult | null>
+  collectOverview(current: OverviewSnapshot): Promise<OverviewSnapshot | null>
   collectServices(services: ServiceRecord[]): Promise<ServiceRecord[] | null>
   collectDocker(): Promise<DockerSnapshot | null>
   collectNas(): Promise<NasSnapshot | null>
@@ -30,6 +32,7 @@ export class SimulationSystemAdapter implements SystemAdapter {
   async runNasScrub() {}
   async runTool() {}
   async executeTerminal() { return null }
+  async collectOverview() { return null }
   async collectServices() { return null }
   async collectDocker() { return null }
   async collectNas() { return null }
@@ -85,6 +88,24 @@ export class LocalSystemAdapter implements SystemAdapter {
     if (!selected) throw new Error("Command is not allowed")
     const output = await this.execute(selected[0], selected[1])
     return { output, status: command.startsWith("journalctl") ? "warning" : "ok" }
+  }
+
+  async collectOverview(current: OverviewSnapshot): Promise<OverviewSnapshot> {
+    const nextOverview = structuredClone(current)
+    nextOverview.hostName = hostname()
+
+    const uptimeHours = Math.floor(osUptime() / 3_600)
+    const days = Math.floor(uptimeHours / 24)
+    nextOverview.uptime = `${days}j ${uptimeHours % 24}h`
+
+    const [memory, disks] = await Promise.all([
+      this.collectMemoryMetric(nextOverview.metrics[1]),
+      this.collectDiskInfo(),
+    ])
+
+    if (memory && nextOverview.metrics[1]) nextOverview.metrics[1] = memory
+    if (disks.length > 0) nextOverview.disks = disks
+    return nextOverview
   }
 
   async collectServices(services: ServiceRecord[]): Promise<ServiceRecord[]> {
@@ -162,6 +183,53 @@ export class LocalSystemAdapter implements SystemAdapter {
     } catch {
       return "failed"
     }
+  }
+
+  private async collectMemoryMetric(current: MetricSparkline | undefined): Promise<MetricSparkline | null> {
+    const meminfo = await this.execute("cat", ["/proc/meminfo"])
+    const values = new Map(
+      meminfo
+        .map((line) => line.match(/^(\w+):\s+(\d+)\s+kB$/))
+        .filter((match): match is RegExpMatchArray => Boolean(match))
+        .map((match) => [match[1], Number.parseInt(match[2] ?? "0", 10)]),
+    )
+
+    const totalKb = values.get("MemTotal")
+    const availableKb = values.get("MemAvailable") ?? values.get("MemFree")
+    if (!totalKb || availableKb === undefined || !current) return current ?? null
+
+    const usedKb = Math.max(0, totalKb - availableKb)
+    const usedGiB = usedKb / 1024 / 1024
+    const totalGiB = totalKb / 1024 / 1024
+    const percent = Math.round((usedKb / totalKb) * 100)
+
+    return {
+      ...current,
+      value: `${usedGiB.toFixed(1).replace(".", ",")} / ${totalGiB.toFixed(0)} Go`,
+      points: [...current.points.slice(-23), percent],
+    }
+  }
+
+  private async collectDiskInfo(): Promise<DiskInfo[]> {
+    const rows = await this.execute("df", ["-kP", "--output=target,size,used,pcent"])
+    return rows
+      .slice(1)
+      .map((row) => row.trim().split(/\s+/))
+      .filter((parts) => parts.length >= 4)
+      .map(([target = "", sizeKb = "0", usedKb = "0", percentValue = "0%"]) => {
+        const totalGiB = Number(sizeKb) / 1024 / 1024
+        const usedGiB = Number(usedKb) / 1024 / 1024
+        const percent = Number.parseInt(percentValue.replace("%", ""), 10) || 0
+        return {
+          name: target,
+          used: Number(usedGiB.toFixed(1)),
+          total: Number(totalGiB.toFixed(0)),
+          unit: "Go" as const,
+          temp: 0,
+          percent,
+        }
+      })
+      .filter((disk) => Number.isFinite(disk.total) && disk.total > 0)
   }
 }
 
