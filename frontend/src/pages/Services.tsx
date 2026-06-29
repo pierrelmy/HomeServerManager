@@ -3,12 +3,13 @@ import {
   IconPlayerStop,
   IconPlayerPlay,
   IconAlertHexagon,
+  IconPlus,
   type IconProps,
   IconLogs,
 } from "@tabler/icons-react"
 import { useMemo, useState } from "react"
-import { Alert, Button, Offcanvas } from "react-bootstrap"
-import type { LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
+import { Alert, Button, Form, Modal, Offcanvas, Spinner } from "react-bootstrap"
+import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
 
 interface ServiceAction {
@@ -33,6 +34,22 @@ function getServiceActions(status: ServiceStatus): ServiceAction[] {
 function capitalize(value: string): string {
   const trimmed = value.trim()
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+}
+
+function predictServiceId(label: string, unit: string): string {
+  const value = (label.trim() || unit.replace(/\.service$/i, "").trim())
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+}
+
+function emptyDraft(): CreateServiceInput {
+  return {
+    label: "",
+    description: "",
+    serviceUnit: "",
+    servicePath: "",
+    installScriptPath: "",
+    startAfterInstall: false,
+  }
 }
 
 function ServiceCard({
@@ -69,7 +86,10 @@ function ServiceCard({
 
       <div className="d-flex flex-column flex-lg-row justify-content-between gap-2">
         <span className="text-secondary">{service.desc}</span>
-        <span className="text-secondary">{service.location}</span>
+        <div className="d-flex flex-column text-secondary text-lg-end">
+          <span>{service.unit}</span>
+          {service.servicePath ? <span className="small">{service.servicePath}</span> : <span className="small">{service.location}</span>}
+        </div>
       </div>
 
       <div className="d-flex flex-wrap justify-content-start gap-2 mt-2">
@@ -136,6 +156,10 @@ export default function Services() {
   const [statusFilters, setStatusFilters] = useState<ServiceStatus[]>([])
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [creatingServiceId, setCreatingServiceId] = useState<string | null>(null)
 
   const handleAction = async (serviceId: string, action: "start" | "stop" | "restart") => {
     if (action !== "start" && !window.confirm(`Confirmer l’action « ${action} » sur le service ${serviceId} ?`)) return
@@ -175,6 +199,39 @@ export default function Services() {
     return services?.find((service) => service.id === displayedLogsServiceId)?.logs ?? []
   }, [displayedLogsServiceId, services])
 
+  const creationLogs = useMemo(() => {
+    if (!creatingServiceId) return []
+    return services?.find((service) => service.id === creatingServiceId)?.logs ?? []
+  }, [creatingServiceId, services])
+
+  const canCreateService =
+    createDraft.label.trim() !== ""
+    && createDraft.serviceUnit.trim() !== ""
+    && (createDraft.servicePath?.trim() || createDraft.installScriptPath?.trim())
+
+  const handleCreateService = async () => {
+    const nextId = predictServiceId(createDraft.label, createDraft.serviceUnit)
+    setCreateError(null)
+    setCreatingServiceId(nextId)
+    setDisplayedLogsServiceId(nextId)
+    try {
+      await liveManager.addService({
+        label: createDraft.label.trim(),
+        description: createDraft.description?.trim() || undefined,
+        serviceUnit: createDraft.serviceUnit.trim(),
+        servicePath: createDraft.servicePath?.trim() || undefined,
+        installScriptPath: createDraft.installScriptPath?.trim() || undefined,
+        startAfterInstall: createDraft.startAfterInstall,
+      })
+      setShowCreateModal(false)
+      setCreateDraft(emptyDraft())
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Impossible d'ajouter le service")
+    } finally {
+      setCreatingServiceId(null)
+    }
+  }
+
   if (!liveState.ready || !services) {
     return <div className="p-3 p-lg-4">Chargement des services...</div>
   }
@@ -193,6 +250,17 @@ export default function Services() {
               onChange={(event) => setSearchStr(event.target.value)}
             />
           </div>
+          <Button
+            variant="primary"
+            className="d-flex align-items-center gap-2"
+            onClick={() => {
+              setCreateError(null)
+              setShowCreateModal(true)
+            }}
+          >
+            <IconPlus />
+            <span>Ajouter un service</span>
+          </Button>
           <Button variant="outline-secondary" onClick={() => void liveManager.refreshAll()}>
             <IconRefresh />
           </Button>
@@ -280,6 +348,123 @@ export default function Services() {
           </div>
         </Offcanvas.Body>
       </Offcanvas>
+
+      <Modal show={showCreateModal} onHide={() => !creatingServiceId && setShowCreateModal(false)} size="lg" centered>
+        <Modal.Header closeButton={!creatingServiceId}>
+          <Modal.Title>Ajouter un service</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {createError ? <Alert variant="danger">{createError}</Alert> : null}
+          <Alert variant="warning">
+            <div className="fw-semibold mb-1">Avertissement sécurité</div>
+            <div>
+              Le script d'installation indiqué sera exécuté sur la machine avec des privilèges élevés.
+              Toute injection, commande destructive ou script non maîtrisé peut compromettre entièrement la VM.
+              Tu es responsable du contenu exécuté, de sa provenance et de ses effets.
+            </div>
+          </Alert>
+
+          <Form
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (canCreateService) void handleCreateService()
+            }}
+          >
+            <Form.Group className="mb-3">
+              <Form.Label>Nom affiché</Form.Label>
+              <Form.Control
+                value={createDraft.label}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
+                placeholder="Ollama"
+                required
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                value={createDraft.description ?? ""}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Service LLM local"
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Unité systemd</Form.Label>
+              <Form.Control
+                value={createDraft.serviceUnit}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
+                placeholder="ollama.service"
+                required
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Chemin du service déjà installé</Form.Label>
+              <Form.Control
+                value={createDraft.servicePath ?? ""}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
+                placeholder="/etc/systemd/system/ollama.service"
+              />
+              <Form.Text className="text-muted">
+                Renseigne ce champ si le service existe déjà sur la machine.
+              </Form.Text>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Script d'installation</Form.Label>
+              <Form.Control
+                value={createDraft.installScriptPath ?? ""}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, installScriptPath: event.target.value }))}
+                placeholder="/opt/scripts/install-ollama.sh"
+              />
+              <Form.Text className="text-muted">
+                Le backend accepte maintenant tout chemin absolu accessible depuis la VM. Vérifie manuellement le script avant exécution.
+              </Form.Text>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                label="Démarrer le service après installation"
+                checked={createDraft.startAfterInstall}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, startAfterInstall: event.target.checked }))}
+              />
+            </Form.Group>
+
+            <div className="border rounded p-3 bg-light">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <span className="fw-semibold">Progression</span>
+                {creatingServiceId ? (
+                  <span className="d-flex align-items-center gap-2 text-secondary">
+                    <Spinner animation="border" size="sm" />
+                    <span>Exécution en cours</span>
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                {creationLogs.length > 0 ? (
+                  creationLogs.map((log, index) => (
+                    <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
+                  ))
+                ) : (
+                  <Alert variant="light" className="mb-0">
+                    Les logs d’installation et d’ajout apparaîtront ici.
+                  </Alert>
+                )}
+              </div>
+            </div>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowCreateModal(false)} disabled={creatingServiceId !== null}>
+            Annuler
+          </Button>
+          <Button variant="primary" onClick={() => void handleCreateService()} disabled={!canCreateService || creatingServiceId !== null}>
+            {creatingServiceId ? "Ajout..." : "Ajouter"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   )
 }

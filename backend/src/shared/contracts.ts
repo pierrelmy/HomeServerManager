@@ -12,7 +12,33 @@ export interface OverviewSnapshot { hostName: string; uptime: string; metrics: M
 export type ServiceStatus = "starting" | "running" | "stopping" | "stopped" | "failed"
 export type LogVerbosity = "debug" | "info" | "warning" | "error"
 export interface ServiceLogEntry { timestamp: string; verbosity: LogVerbosity; content: string }
-export interface ServiceRecord { id: string; label: string; desc: string; location: string; status: ServiceStatus; logs: ServiceLogEntry[] }
+export interface ServiceRecord {
+  id: string
+  label: string
+  desc: string
+  location: string
+  unit: string
+  servicePath: string | null
+  status: ServiceStatus
+  logs: ServiceLogEntry[]
+}
+export const createServiceSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(240).optional(),
+  serviceUnit: z.string().trim().min(1).max(200),
+  servicePath: z.string().trim().min(1).max(500).optional(),
+  installScriptPath: z.string().trim().min(1).max(500).optional(),
+  startAfterInstall: z.boolean().default(false),
+}).strict().superRefine((value, ctx) => {
+  if (!value.servicePath && !value.installScriptPath) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "servicePath or installScriptPath is required",
+      path: ["servicePath"],
+    })
+  }
+})
+export type CreateServiceInput = z.infer<typeof createServiceSchema>
 
 export interface DockerContainer { id: string; name: string; imageId: string; volumeId: string; cpuPercent: number; lastStarted: string }
 export interface DockerImage { id: string; name: string; tag: string; created: string; sizeMB: number }

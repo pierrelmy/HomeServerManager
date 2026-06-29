@@ -73,8 +73,8 @@ describe("homelab API", () => {
     const servicesResponse = await built.app.inject({ method: "GET", url: "/services" })
     expect(servicesResponse.statusCode).toBe(200)
     expect(servicesResponse.json()).toEqual([
-      expect.objectContaining({ id: "demo-service", label: "Demo Service", location: "homelab-demo.service" }),
-      expect.objectContaining({ id: "docker-engine", label: "Docker Engine", location: "docker.service" }),
+      expect.objectContaining({ id: "demo-service", label: "Demo Service", location: "homelab-demo.service", unit: "homelab-demo.service", servicePath: null }),
+      expect.objectContaining({ id: "docker-engine", label: "Docker Engine", location: "docker.service", unit: "docker.service", servicePath: null }),
     ])
 
     const toolsResponse = await built.app.inject({ method: "GET", url: "/tools" })
@@ -156,6 +156,8 @@ describe("homelab API", () => {
       label: "Demo Service",
       desc: "Service de test",
       location: "homelab-demo.service",
+      unit: "homelab-demo.service",
+      servicePath: null,
       status: "stopped",
       logs: [],
     })
@@ -169,6 +171,42 @@ describe("homelab API", () => {
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
     expect(audit.json()).toEqual(expect.arrayContaining([expect.objectContaining({ action: "service.start", resource: "demo-service" })]))
+  })
+
+  it("adds a service and persists its metadata", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+    const response = await instance.app.inject({
+      method: "POST",
+      url: "/services",
+      headers: { cookie },
+      payload: {
+        label: "Ollama",
+        description: "LLM local",
+        serviceUnit: "ollama.service",
+        servicePath: "/etc/systemd/system/ollama.service",
+        startAfterInstall: false,
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      id: "ollama",
+      label: "Ollama",
+      desc: "LLM local",
+      unit: "ollama.service",
+      servicePath: "/etc/systemd/system/ollama.service",
+      status: "stopped",
+    })
+
+    const services = await instance.app.inject({ method: "GET", url: "/services" })
+    expect(services.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "ollama",
+        unit: "ollama.service",
+        servicePath: "/etc/systemd/system/ollama.service",
+      }),
+    ]))
   })
 
   it("only executes allowlisted terminal commands", async () => {
@@ -224,6 +262,8 @@ describe("homelab API", () => {
       label: "Demo Service",
       desc: "Service de test",
       location: "homelab-demo.service",
+      unit: "homelab-demo.service",
+      servicePath: null,
       status: "stopped",
       logs: [],
     })

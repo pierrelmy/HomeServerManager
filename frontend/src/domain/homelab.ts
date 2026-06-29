@@ -45,11 +45,22 @@ export interface ServiceLogEntry {
   content: string
 }
 
+export interface CreateServiceInput {
+  label: string
+  description?: string
+  serviceUnit: string
+  servicePath?: string
+  installScriptPath?: string
+  startAfterInstall: boolean
+}
+
 export interface ServiceRecord {
   id: string
   label: string
   desc: string
   location: string
+  unit: string
+  servicePath: string | null
   status: ServiceStatus
   logs: ServiceLogEntry[]
 }

@@ -83,6 +83,15 @@ Mode réservé à l’hôte de production ou à une machine explicitement prépa
 
 Ne pas utiliser ce mode sur une machine de développement standard sans avoir configuré `sudoers`, les scripts et les mappings système.
 
+Le flux d'ajout de service via `POST /services` accepte :
+
+- `serviceUnit` pour l'unité systemd cible
+- `servicePath` pour rattacher un service déjà installé
+- `installScriptPath` pour déclencher un script d'installation arbitraire
+- `startAfterInstall` pour démarrer le service juste après l'installation
+
+`installScriptPath` doit rester un chemin absolu. Le backend l'exécute via `sudo -n /bin/bash <script>`. Cette option donne un pouvoir d'exécution root très large et doit être réservée à un environnement administré.
+
 Pour la VM Ubuntu de validation :
 
 - la mémoire affichée dans `/overview` suit la colonne `used` de `free -h`
@@ -127,6 +136,7 @@ En local, vous pouvez utiliser par exemple :
 
 ### Administration
 
+- `POST /services`
 - `PATCH /settings`
 - `POST /services/:id/start|stop|restart`
 - `POST /docker/containers/:id/start|stop|restart`

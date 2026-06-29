@@ -1,7 +1,17 @@
-import { execFile } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import { promisify } from "node:util"
 import { hostname, uptime as osUptime } from "node:os"
-import type { DiskInfo, DockerSnapshot, MetricSparkline, NasSnapshot, OverviewSnapshot, ServiceRecord, ServiceStatus } from "../shared/contracts.js"
+import type {
+  CreateServiceInput,
+  DiskInfo,
+  DockerSnapshot,
+  LogVerbosity,
+  MetricSparkline,
+  NasSnapshot,
+  OverviewSnapshot,
+  ServiceRecord,
+  ServiceStatus,
+} from "../shared/contracts.js"
 import { badRequest } from "../shared/errors.js"
 
 const execFileAsync = promisify(execFile)
@@ -13,6 +23,8 @@ export interface CommandResult {
 
 export interface SystemAdapter {
   readonly mode: "simulation" | "local"
+  registerService(id: string, unit: string): void
+  addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void): Promise<{ servicePath: string | null; status: ServiceStatus }>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnImage(reference: string, action: "pull" | "run"): Promise<void>
@@ -27,6 +39,12 @@ export interface SystemAdapter {
 
 export class SimulationSystemAdapter implements SystemAdapter {
   readonly mode = "simulation" as const
+  registerService() {}
+  async addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void) {
+    onLog("info", `Simulation: préparation du service ${input.serviceUnit}`)
+    if (input.installScriptPath) onLog("debug", `Simulation: script ${input.installScriptPath}`)
+    return { servicePath: input.servicePath ?? null, status: input.startAfterInstall ? "running" : "stopped" as ServiceStatus }
+  }
   async actOnService() {}
   async actOnContainer() {}
   async actOnImage() {}
@@ -53,6 +71,52 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   constructor(private readonly options: LocalSystemAdapterOptions) {
     this.timeoutMs = options.timeoutMs ?? 30_000
+  }
+
+  registerService(id: string, unit: string) {
+    this.options.serviceMap[id] = unit
+  }
+
+  async addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void) {
+    const servicePath = input.servicePath?.trim() || null
+    const installScriptPath = input.installScriptPath?.trim() || null
+
+    this.validateServiceUnit(input.serviceUnit)
+    if (servicePath) this.validateAbsolutePath(servicePath, "servicePath")
+    if (installScriptPath) this.validateAbsolutePath(installScriptPath, "installScriptPath")
+
+    onLog("info", `Vérification du service ${input.serviceUnit}`)
+
+    let serviceFilePresent = false
+    if (servicePath) {
+      serviceFilePresent = await this.pathExists(servicePath)
+      if (serviceFilePresent) onLog("info", `Fichier service détecté: ${servicePath}`)
+    }
+
+    if (!serviceFilePresent && installScriptPath) {
+      onLog("info", `Exécution du script d'installation: ${installScriptPath}`)
+      await this.executeStreaming("sudo", ["-n", "/bin/bash", installScriptPath], onLog)
+    }
+
+    onLog("info", "Rechargement de systemd")
+    await this.executeStreaming("sudo", ["-n", "systemctl", "daemon-reload"], onLog)
+
+    if (servicePath) {
+      await this.ensurePathExists(servicePath, onLog)
+    }
+
+    onLog("info", `Validation de l'unité ${input.serviceUnit}`)
+    await this.executeStreaming("systemctl", ["cat", input.serviceUnit], onLog)
+
+    this.registerService(slugFromUnit(input.serviceUnit), input.serviceUnit)
+
+    if (input.startAfterInstall) {
+      onLog("info", `Démarrage de ${input.serviceUnit}`)
+      await this.executeStreaming("sudo", ["-n", "systemctl", "start", input.serviceUnit], onLog)
+    }
+
+    const status = await this.getServiceStatusByUnit(input.serviceUnit)
+    return { servicePath, status }
   }
 
   async actOnService(id: string, action: "start" | "stop" | "restart") {
@@ -183,6 +247,10 @@ export class LocalSystemAdapter implements SystemAdapter {
   private async getServiceStatus(id: string): Promise<ServiceStatus> {
     const unit = this.options.serviceMap[id]
     if (!unit) return "failed"
+    return this.getServiceStatusByUnit(unit)
+  }
+
+  private async getServiceStatusByUnit(unit: string): Promise<ServiceStatus> {
     try {
       const output = await this.execute("systemctl", ["is-active", unit])
       const state = output[0]
@@ -193,6 +261,75 @@ export class LocalSystemAdapter implements SystemAdapter {
       return "failed"
     } catch {
       return "failed"
+    }
+  }
+
+  private validateServiceUnit(unit: string): void {
+    if (!/^[a-zA-Z0-9@_.-]+\.service$/.test(unit)) {
+      throw badRequest("serviceUnit must be a valid systemd unit name ending with .service")
+    }
+  }
+
+  private validateAbsolutePath(value: string, label: string): void {
+    if (!value.startsWith("/")) throw badRequest(`${label} must be an absolute path`)
+  }
+  private async ensurePathExists(path: string, onLog: (verbosity: LogVerbosity, content: string) => void): Promise<void> {
+    if (!await this.pathExists(path)) {
+      onLog("error", `Fichier introuvable: ${path}`)
+      throw badRequest(`Service file is missing: ${path}`)
+    }
+  }
+
+  private async executeStreaming(executable: string, args: string[], onLog: (verbosity: LogVerbosity, content: string) => void): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(executable, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+      })
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM")
+        reject(badRequest(`${executable} ${args.join(" ")} timed out after ${this.timeoutMs}ms`))
+      }, this.timeoutMs)
+      let stdoutBuffer = ""
+      let stderrBuffer = ""
+
+      const flush = (buffer: string, verbosity: LogVerbosity) => {
+        const lines = buffer.split(/\r?\n/)
+        const pending = lines.pop() ?? ""
+        for (const line of lines.map((item) => item.trim()).filter(Boolean)) onLog(verbosity, line)
+        return pending
+      }
+
+      child.stdout.on("data", (chunk: Buffer | string) => {
+        stdoutBuffer += chunk.toString()
+        stdoutBuffer = flush(stdoutBuffer, "info")
+      })
+      child.stderr.on("data", (chunk: Buffer | string) => {
+        stderrBuffer += chunk.toString()
+        stderrBuffer = flush(stderrBuffer, "warning")
+      })
+      child.on("error", (error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+      child.on("close", (code) => {
+        clearTimeout(timer)
+        if (stdoutBuffer.trim()) onLog("info", stdoutBuffer.trim())
+        if (stderrBuffer.trim()) onLog("warning", stderrBuffer.trim())
+        if (code === 0) {
+          resolve()
+          return
+        }
+        reject(badRequest(`${executable} ${args.join(" ")} failed with exit code ${code ?? "unknown"}`))
+      })
+    })
+  }
+
+  private async pathExists(path: string): Promise<boolean> {
+    try {
+      await this.execute("test", ["-f", path])
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -297,4 +434,8 @@ export function parseCommand(value: string, label: string): string[] {
   const parsed: unknown = JSON.parse(value)
   if (!Array.isArray(parsed) || parsed.some((part) => typeof part !== "string")) throw new Error(`${label} must be a JSON string array`)
   return parsed
+}
+
+function slugFromUnit(unit: string): string {
+  return unit.replace(/\.service$/, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "").toLowerCase()
 }

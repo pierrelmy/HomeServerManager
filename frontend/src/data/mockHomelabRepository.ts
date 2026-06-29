@@ -118,6 +118,26 @@ export function createMockHomelabRepository(): HomelabRepository {
       return delay(settings)
     },
     changePassword: async () => delay(undefined),
+    addService: async (input) => {
+      const id = (input.label || input.serviceUnit.replace(/\.service$/i, ""))
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+      const service: ServiceRecord = {
+        id,
+        label: input.label,
+        desc: input.description ?? `Service géré via ${input.serviceUnit}`,
+        location: input.servicePath ?? input.serviceUnit,
+        unit: input.serviceUnit,
+        servicePath: input.servicePath ?? null,
+        status: input.startAfterInstall ? "running" : "stopped",
+        logs: [{ timestamp: "00:00:00", verbosity: "info", content: "Service simulé ajouté" }],
+      }
+      services.unshift(service)
+      return delay(service)
+    },
     actOnService: async (_id, _action) => {
       throw new Error("Aucun service n'est configuré dans ce mode.")
     },

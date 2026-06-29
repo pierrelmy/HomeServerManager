@@ -12,6 +12,7 @@ import { HomelabService } from "./services/homelab-service.js"
 import { HttpError, forbidden, unauthorized } from "./shared/errors.js"
 import { LocalSystemAdapter, SimulationSystemAdapter, parseCommand, parseCommandMap, parseStringMap } from "./system/system-adapter.js"
 import {
+  createServiceSchema,
   realtimeCommandSchema,
   settingsPatchSchema,
   terminalExecuteSchema,
@@ -267,6 +268,12 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     repository.appendAudit({ sessionId: session.id, actor: session.displayName, action: "settings.update", resource: session.userId, outcome: "success" })
     events.sendToSession(session.id, { type: "settings.updated", settings })
     return settings
+  })
+
+  app.post("/services", { preHandler: requireAdmin, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request) => {
+    const session = getSession(request)!
+    const body = createServiceSchema.parse(request.body)
+    return audited(repository, session, "service.add", body.serviceUnit, () => service.addService(body))
   })
 
   app.post("/services/:id/:action", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {

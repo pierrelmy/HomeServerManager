@@ -1,6 +1,7 @@
 import type {
   AccountProfile,
   AuthSession,
+  CreateServiceInput,
   DockerSnapshot,
   DockerContainer,
   NasSnapshot,
@@ -65,6 +66,11 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
         body: JSON.stringify({ currentPassword, nextPassword }),
       })
     },
+    addService: (input: CreateServiceInput) =>
+      fetchJson<ServiceRecord>(baseUrl, "/services", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     actOnService: (id, action) =>
       fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     actOnContainer: (id, action) =>

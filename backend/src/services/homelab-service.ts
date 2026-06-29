@@ -3,6 +3,7 @@ import { hostname, loadavg, uptime } from "node:os"
 import type { EventHub } from "../events/event-hub.js"
 import type { HomelabRepository } from "../repositories/homelab-repository.js"
 import type {
+  CreateServiceInput,
   HomelabLiveBundle,
   ServiceRecord,
   SettingsState,
@@ -104,19 +105,28 @@ export class HomelabService {
     if (this.system.mode !== "local") return
 
     const existingServices = new Map(this.repository.listServices().map((service) => [service.id, service]))
-    const nextServices = Object.entries(serviceMap).map(([id, unit]) => {
+    const configuredServices = Object.entries(serviceMap).map(([id, unit]) => {
       const existing = existingServices.get(id)
       const metadata = knownServiceMetadata[id]
+      this.system.registerService(id, unit)
       return {
         id,
         label: metadata?.label ?? humanizeId(id),
         desc: metadata?.desc ?? `Service mappé vers ${unit}`,
         location: unit,
+        unit,
+        servicePath: existing?.servicePath ?? null,
         status: existing?.status ?? "stopped",
         logs: existing?.logs ?? [],
       } satisfies ServiceRecord
     })
-    this.repository.replaceServices(nextServices)
+    const dynamicServices = this.repository.listServices()
+      .filter((service) => !serviceMap[service.id] && service.unit.trim() !== "")
+      .map((service) => {
+        this.system.registerService(service.id, service.unit)
+        return service
+      })
+    this.repository.replaceServices([...configuredServices, ...dynamicServices])
 
     const currentTools = this.repository.getTools()
     const nextTools = {
@@ -203,6 +213,47 @@ export class HomelabService {
     return service
   }
 
+  async addService(input: CreateServiceInput): Promise<ServiceRecord> {
+    const id = slug(input.label || input.serviceUnit.replace(/\.service$/, ""))
+    if (this.repository.getService(id)) throw conflict(`Service ${id} already exists`)
+
+    const service: ServiceRecord = {
+      id,
+      label: input.label.trim(),
+      desc: input.description?.trim() || `Service géré via ${input.serviceUnit}`,
+      location: input.servicePath?.trim() || input.serviceUnit.trim(),
+      unit: input.serviceUnit.trim(),
+      servicePath: input.servicePath?.trim() || null,
+      status: "starting",
+      logs: [],
+    }
+
+    this.system.registerService(service.id, service.unit)
+    this.repository.saveService(service)
+    this.events.broadcast({ type: "service.updated", service })
+    this.appendServiceLog(service.id, "info", "Initialisation de l'ajout du service")
+
+    try {
+      const result = await this.system.addService(input, (verbosity, content) => {
+        this.appendServiceLog(service.id, verbosity, content)
+      })
+      service.status = result.status
+      service.servicePath = result.servicePath
+      service.location = result.servicePath ?? service.unit
+      this.appendServiceLog(service.id, "info", "Service ajouté avec succès")
+      this.repository.saveService(service)
+      this.events.broadcast({ type: "service.updated", service })
+      return service
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ajout du service impossible"
+      service.status = "failed"
+      this.appendServiceLog(service.id, "error", message)
+      this.repository.saveService(service)
+      this.events.broadcast({ type: "service.updated", service })
+      throw error
+    }
+  }
+
   async actOnContainer(id: string, action: "start" | "stop" | "restart") {
     const docker = this.repository.getDocker()
     const container = docker.containers.find((item) => item.id === id)
@@ -257,6 +308,15 @@ export class HomelabService {
     this.repository.saveTools(tools)
     this.events.broadcast({ type: "tools.updated", tools })
     return job
+  }
+
+  private appendServiceLog(serviceId: string, verbosity: "debug" | "info" | "warning" | "error", content: string): void {
+    const service = this.repository.getService(serviceId)
+    if (!service) return
+    const log = { timestamp: timeStamp(), verbosity, content }
+    service.logs = [...service.logs, log].slice(-100)
+    this.repository.saveService(service)
+    this.events.broadcast({ type: "service.log.appended", serviceId, log, limit: 100 })
   }
 
   async executeTerminal(command: string, requestedSessionId?: string): Promise<{ sessionId: string; line: TerminalLine }> {

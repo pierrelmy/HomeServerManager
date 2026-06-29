@@ -18,6 +18,33 @@ L'IP utilisee dans les exemples est :
 192.168.64.6
 ```
 
+## Script de bootstrap idempotent
+
+Le plus simple est maintenant de lancer un script unique qui prépare la VM, puis de garder `update-hsm-dev.sh` pour les mises à jour quotidiennes.
+
+Le script :
+
+- installe les prérequis système seulement s’ils manquent
+- installe Node.js 24 et Docker seulement si nécessaire
+- crée l’utilisateur de service et les répertoires utiles
+- clone ou remet à niveau le dépôt sur `dev`
+- installe les scripts système, le `sudoers`, les unités systemd et les `.env` locaux
+- installe les dépendances npm seulement si le lockfile a changé
+- ne rebuild pas inutilement si le commit et les dépendances sont déjà alignés
+- redémarre les services uniquement si nécessaire
+
+Les scripts d'installation de services déclenchés depuis l'UI peuvent maintenant être n'importe quels scripts accessibles par chemin absolu sur la VM. Le backend les exécute via `sudo -n /bin/bash <script>`.
+
+Commande recommandée sur la VM :
+
+```bash
+sudo VM_IP=192.168.64.6 bash /srv/homeservermanager-dev/deploy/setup-utm-vm.sh
+```
+
+Si l’IP n’est pas connue, le script essaie de la détecter automatiquement. Si la détection échoue, il demande de la fournir explicitement via `VM_IP=...`.
+
+Si tu veux aussi Ollama dans l’UI, installe-le ensuite avec l’installateur officiel Linux puis ajoute `{"ollama":"ollama.service"}` dans `SYSTEM_SERVICE_MAP` du backend local.
+
 ## Ce que tu vas obtenir
 
 A la fin, tu auras :
@@ -27,6 +54,7 @@ A la fin, tu auras :
 - une branche locale `dev` suivie depuis `origin/dev`
 - un backend `SYSTEM_ADAPTER=local` sur le port `3000`
 - un frontend build puis servi en preview sur le port `4173`
+- un script de bootstrap idempotent pour rejouer l’installation sans tout refaire
 - un script unique `update-hsm-dev.sh` pour mettre a jour la VM
 
 ## Prerequis
