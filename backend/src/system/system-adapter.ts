@@ -195,10 +195,10 @@ export class LocalSystemAdapter implements SystemAdapter {
     )
 
     const totalKb = values.get("MemTotal")
-    const availableKb = values.get("MemAvailable") ?? values.get("MemFree")
-    if (!totalKb || availableKb === undefined || !current) return current ?? null
+    const freeKb = values.get("MemFree")
+    if (!totalKb || freeKb === undefined || !current) return current ?? null
 
-    const usedKb = Math.max(0, totalKb - availableKb)
+    const usedKb = Math.max(0, totalKb - freeKb)
     const usedGiB = usedKb / 1024 / 1024
     const totalGiB = totalKb / 1024 / 1024
     const percent = Math.round((usedKb / totalKb) * 100)
