@@ -211,25 +211,41 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   private async collectDiskInfo(): Promise<DiskInfo[]> {
-    const rows = await this.execute("df", ["-kP", "--output=target,size,used,pcent"])
-    return rows
-      .slice(1)
-      .map((row) => row.trim().split(/\s+/))
-      .filter((parts) => parts.length >= 4)
-      .map(([target = "", sizeKb = "0", usedKb = "0", percentValue = "0%"]) => {
-        const totalGiB = Number(sizeKb) / 1024 / 1024
-        const usedGiB = Number(usedKb) / 1024 / 1024
-        const percent = Number.parseInt(percentValue.replace("%", ""), 10) || 0
-        return {
-          name: target,
-          used: Number(usedGiB.toFixed(1)),
-          total: Number(totalGiB.toFixed(0)),
-          unit: "Go" as const,
-          temp: 0,
-          percent,
-        }
-      })
-      .filter((disk) => Number.isFinite(disk.total) && disk.total > 0)
+    try {
+      const rows = await this.execute("df", ["-k", "--output=target,size,used,pcent"])
+      return rows
+        .slice(1)
+        .map((row) => row.trim().split(/\s+/))
+        .filter((parts) => parts.length >= 4)
+        .map(([target = "", sizeKb = "0", usedKb = "0", percentValue = "0%"]) =>
+          toDiskInfo(target, sizeKb, usedKb, percentValue))
+        .filter((disk) => Number.isFinite(disk.total) && disk.total > 0)
+    } catch {
+      const rows = await this.execute("df", ["-kP"])
+      return rows
+        .slice(1)
+        .map((row) => row.trim().split(/\s+/))
+        .filter((parts) => parts.length >= 6)
+        .map((parts) => {
+          const [, sizeKb = "0", usedKb = "0", , percentValue = "0%", ...targetParts] = parts
+          return toDiskInfo(targetParts.join(" "), sizeKb, usedKb, percentValue)
+        })
+        .filter((disk) => Number.isFinite(disk.total) && disk.total > 0)
+    }
+  }
+}
+
+function toDiskInfo(target: string, sizeKb: string, usedKb: string, percentValue: string): DiskInfo {
+  const totalGiB = Number(sizeKb) / 1024 / 1024
+  const usedGiB = Number(usedKb) / 1024 / 1024
+  const percent = Number.parseInt(percentValue.replace("%", ""), 10) || 0
+  return {
+    name: target,
+    used: Number(usedGiB.toFixed(1)),
+    total: Number(totalGiB.toFixed(0)),
+    unit: "Go" as const,
+    temp: 0,
+    percent,
   }
 }
 
