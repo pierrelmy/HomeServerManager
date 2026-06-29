@@ -15,9 +15,14 @@ import type { HomelabRepository } from "./homelabRepository"
 
 async function fetchJson<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl
+  const headers = new Headers(init?.headers ?? {})
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
   const response = await fetch(`${normalizedBase}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers,
     ...init,
   })
 
