@@ -1,6 +1,7 @@
 import { Alert, Badge, Card, ProgressBar } from "react-bootstrap"
 import { IconAlertCircle, IconAlertTriangle, IconClock, IconServer2 } from "@tabler/icons-react"
 import { useHomelabLiveState, useHomelabOverview } from "../live/useHomelabLive"
+import type { MetricSparkline } from "../domain/homelab"
 
 function LoadingState() {
   return (
@@ -34,6 +35,21 @@ function MetricCard({
   )
 }
 
+function metricPercent(metric: MetricSparkline): number {
+  const lastPoint = metric.points.at(-1)
+  if (typeof lastPoint === "number" && Number.isFinite(lastPoint)) {
+    return Math.max(0, Math.min(100, lastPoint))
+  }
+
+  const percentMatch = metric.value.match(/(\d+(?:[.,]\d+)?)\s*%/)
+  if (percentMatch?.[1]) {
+    const parsed = Number.parseFloat(percentMatch[1].replace(",", "."))
+    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, parsed))
+  }
+
+  return 0
+}
+
 export default function Home() {
   const overview = useHomelabOverview()
   const liveState = useHomelabLiveState()
@@ -63,7 +79,7 @@ export default function Home() {
             <MetricCard
               label={metric.label}
               value={metric.value}
-              percent={Math.min(100, 35 + index * 18)}
+              percent={metricPercent(metric)}
               accent={index === 0 ? "primary" : index === 1 ? "warning" : "success"}
             />
           </div>
