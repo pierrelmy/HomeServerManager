@@ -83,6 +83,12 @@ Mode réservé à l’hôte de production ou à une machine explicitement prépa
 
 Ne pas utiliser ce mode sur une machine de développement standard sans avoir configuré `sudoers`, les scripts et les mappings système.
 
+Pour la VM Ubuntu de validation :
+
+- la mémoire affichée dans `/overview` suit la colonne `used` de `free -h`
+- les disques affichés dans `/overview` sont dérivés de `df`
+- les scripts système (`scan-network`, `nas-status`) restent installés hors du repo, dans `/usr/local/libexec/homeservermanager/`
+
 ## Persistance
 
 Le backend persiste son état dans SQLite via `SqliteHomelabRepository`.

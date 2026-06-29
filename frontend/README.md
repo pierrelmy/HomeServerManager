@@ -25,6 +25,23 @@ npm run dev
 
 Le frontend écoute alors sur `http://localhost:5173`.
 
+### Mode VM Ubuntu validé
+
+Pour le workflow `Mac -> git push origin dev -> VM update`, la version validée est :
+
+- build frontend dans la VM avec `.env`
+- service systemd `homelab-frontend-dev.service`
+- `vite preview` exposé sur `http://192.168.64.6:4173`
+
+Variables utilisées dans la VM :
+
+```dotenv
+VITE_API_BASE_URL=http://192.168.64.6:3000
+VITE_WS_URL=ws://192.168.64.6:3000/live
+```
+
+Le service frontend dev tourne sous l'utilisateur `ubuntu` et n'a le droit d'écrire que dans `node_modules/.vite-temp`.
+
 ### Mode mock sans backend
 
 Si `VITE_API_BASE_URL` et `VITE_WS_URL` ne sont pas définies, le frontend bascule automatiquement sur :

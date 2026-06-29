@@ -4,21 +4,44 @@ set -euo pipefail
 ROOT=/srv/homeservermanager-dev
 BRANCH=dev
 
-cd "$ROOT"
-git fetch origin
-git switch "$BRANCH"
-git reset --hard "origin/$BRANCH"
+echo "==> Updating $ROOT on branch $BRANCH"
 
-cd "$ROOT/backend"
-npm ci --no-audit --no-fund
-npm run build
+sudo -u ubuntu bash -lc "
+  cd '$ROOT' &&
+  git fetch origin &&
+  git switch '$BRANCH' &&
+  git reset --hard 'origin/$BRANCH'
+"
 
-cd "$ROOT/frontend"
-npm ci --no-audit --no-fund
-npm run build
+echo "==> Backend install/build"
+sudo -u ubuntu bash -lc "
+  cd '$ROOT/backend' &&
+  npm ci --no-audit --no-fund &&
+  npm run build
+"
 
+echo "==> Frontend install/build"
+sudo -u ubuntu bash -lc "
+  mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
+  cd '$ROOT/frontend' &&
+  npm ci --no-audit --no-fund &&
+  npm run build
+"
+
+echo "==> Syncing root-owned helper scripts"
+install -m 0755 -o root -g root "$ROOT/deploy/scripts/scan-network.mjs" /usr/local/libexec/homeservermanager/scan-network
+
+echo "==> Restarting services"
 sudo systemctl restart homeservermanager-backend-dev
 sudo systemctl restart homeservermanager-frontend-dev
+
+echo "==> Health checks"
+curl --fail --silent http://127.0.0.1:3000/health >/dev/null
+curl --fail --silent http://127.0.0.1:3000/ready >/dev/null
+curl --fail --silent http://127.0.0.1:4173 >/dev/null
+
+echo "==> Deployed revision"
+sudo -u ubuntu bash -lc "cd '$ROOT' && git rev-parse --short HEAD"
 
 sudo systemctl --no-pager --full status homeservermanager-backend-dev
 sudo systemctl --no-pager --full status homeservermanager-frontend-dev

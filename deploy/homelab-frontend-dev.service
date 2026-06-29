@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=homelab
-Group=homelab
+User=ubuntu
+Group=ubuntu
 WorkingDirectory=/srv/homeservermanager-dev/frontend
 ExecStart=/usr/bin/node /srv/homeservermanager-dev/frontend/node_modules/vite/bin/vite.js preview --host 0.0.0.0 --port 4173
 Restart=on-failure
@@ -15,6 +15,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
+ReadWritePaths=/srv/homeservermanager-dev/frontend/node_modules/.vite-temp
 
 [Install]
 WantedBy=multi-user.target

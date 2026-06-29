@@ -151,20 +151,8 @@ sudo chown root:root /usr/local/libexec/homeservermanager/scan-network
 
 ```bash
 sudo tee /usr/local/libexec/homeservermanager/nas-status >/dev/null <<'EOF'
-#!/usr/bin/env node
-process.stdout.write(JSON.stringify({
-  capacityUsed: "20 Go / 100 Go",
-  healthSummary: "VM de test",
-  backupSummary: "Non configuré",
-  temperatureSummary: "N/A",
-  pools: [
-    { name: "vm-data", type: "ext4", used: 20, total: 100, temp: 0, health: "Healthy" }
-  ],
-  backups: [],
-  drives: [
-    { slot: "vda", model: "Virtual Disk", temp: 0, status: "Healthy" }
-  ],
-}))
+#!/usr/bin/env sh
+printf '%s' '{"capacityUsed":"20 Go / 100 Go","healthSummary":"VM de test","backupSummary":"Non configure","temperatureSummary":"N/A","pools":[{"name":"vm-data","type":"ext4","used":20,"total":100,"temp":0,"health":"Healthy"}],"backups":[],"drives":[{"slot":"vda","model":"Virtual Disk","temp":0,"status":"Healthy"}]}'
 EOF
 sudo chmod 0755 /usr/local/libexec/homeservermanager/nas-status
 sudo chown root:root /usr/local/libexec/homeservermanager/nas-status
@@ -242,6 +230,7 @@ Important :
 - ces deux fichiers `.env` restent sur la VM
 - ils ne doivent pas etre commits
 - le frontend est build avec ces variables puis servi statiquement
+- le checkout Git frontend et `node_modules` doivent rester possedes par `ubuntu`
 
 ## Etape 10 - Installer le `sudoers`
 
@@ -269,6 +258,12 @@ sudo cp /srv/homeservermanager-dev/deploy/homelab-frontend-dev.service /etc/syst
 sudo systemctl daemon-reload
 ```
 
+L'unite frontend dev fournie par le repo :
+
+- tourne en utilisateur `ubuntu`
+- autorise l'ecriture uniquement dans `frontend/node_modules/.vite-temp`
+- evite ainsi les erreurs `EROFS` rencontrees avec `vite preview`
+
 ## Etape 12 - Installer le script de mise a jour
 
 ```bash
@@ -281,9 +276,12 @@ Le script fait :
 - `git fetch origin`
 - `git switch dev`
 - `git reset --hard origin/dev`
-- `npm ci` + `npm run build` backend
-- `npm ci` + `npm run build` frontend
+- `npm ci` + `npm run build` backend en utilisateur `ubuntu`
+- `npm ci` + `npm run build` frontend en utilisateur `ubuntu`
+- resynchronise `scan-network` dans `/usr/local/libexec/homeservermanager/scan-network`
 - restart backend + frontend
+- verifie `/health`, `/ready` et `http://127.0.0.1:4173`
+- affiche la revision Git deployee
 
 ## Etape 13 - Premier build + premier demarrage
 
@@ -346,7 +344,7 @@ git push origin dev
 Sur la VM :
 
 ```bash
-sudo /usr/local/bin/update-hsm-dev.sh
+sudo bash /usr/local/bin/update-hsm-dev.sh
 ```
 
 ## Verification rapide que la VM tourne bien sur le bon code
@@ -434,7 +432,7 @@ curl http://127.0.0.1:3000/overview
 
 Le backend local recent :
 
-- lit la RAM depuis `/proc/meminfo` avec `MemAvailable`
+- lit la RAM via `free -k`, donc la valeur affichee suit la colonne `used` de `free -h`
 - lit les disques via `df`
 
 ## References
