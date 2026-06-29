@@ -186,19 +186,15 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   private async collectMemoryMetric(current: MetricSparkline | undefined): Promise<MetricSparkline | null> {
-    const meminfo = await this.execute("cat", ["/proc/meminfo"])
-    const values = new Map(
-      meminfo
-        .map((line) => line.match(/^(\w+):\s+(\d+)\s+kB$/))
-        .filter((match): match is RegExpMatchArray => Boolean(match))
-        .map((match) => [match[1], Number.parseInt(match[2] ?? "0", 10)]),
-    )
+    const rows = await this.execute("free", ["-k"])
+    const memoryRow = rows.find((line) => line.trim().startsWith("Mem:"))
+    if (!memoryRow || !current) return current ?? null
 
-    const totalKb = values.get("MemTotal")
-    const freeKb = values.get("MemFree")
-    if (!totalKb || freeKb === undefined || !current) return current ?? null
+    const parts = memoryRow.trim().split(/\s+/)
+    const totalKb = Number.parseInt(parts[1] ?? "0", 10)
+    const usedKb = Number.parseInt(parts[2] ?? "0", 10)
+    if (!totalKb || !Number.isFinite(usedKb)) return current ?? null
 
-    const usedKb = Math.max(0, totalKb - freeKb)
     const usedGiB = usedKb / 1024 / 1024
     const totalGiB = totalKb / 1024 / 1024
     const percent = Math.round((usedKb / totalKb) * 100)
