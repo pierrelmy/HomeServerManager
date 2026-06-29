@@ -264,6 +264,8 @@ L'unite frontend dev fournie par le repo :
 - autorise l'ecriture uniquement dans `frontend/node_modules/.vite-temp`
 - evite ainsi les erreurs `EROFS` rencontrees avec `vite preview`
 
+L'unite backend dev fournie par le repo n'active pas `NoNewPrivileges=true`, car le backend doit pouvoir appeler `sudo -n systemctl ...` pour les services explicitement allowlistes dans `/etc/sudoers.d/homeservermanager`.
+
 ## Etape 12 - Installer le script de mise a jour
 
 ```bash
