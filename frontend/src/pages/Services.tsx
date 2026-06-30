@@ -20,7 +20,7 @@ import {
   IconLogs,
   IconExternalLink,
 } from "@tabler/icons-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Alert, Button, Form, Modal, Nav, Offcanvas, Spinner } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
@@ -381,6 +381,7 @@ export default function Services() {
   const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
   const [createError, setCreateError] = useState<string | null>(null)
   const [creatingServiceId, setCreatingServiceId] = useState<string | null>(null)
+  const [createProgressLogs, setCreateProgressLogs] = useState<Array<{ timestamp: string; verbosity: LogVerbosity; content: string }>>([])
 
   const handleAction = async (serviceId: string, action: "start" | "stop" | "restart") => {
     if (action !== "start" && !window.confirm(`Confirmer l’action « ${action} » sur le service ${serviceId} ?`)) return
@@ -445,9 +446,12 @@ export default function Services() {
     return services?.find((service) => service.id === displayedLogsServiceId)?.logs ?? []
   }, [displayedLogsServiceId, services])
 
-  const creationLogs = useMemo(() => {
-    if (!creatingServiceId) return []
-    return services?.find((service) => service.id === creatingServiceId)?.logs ?? []
+  useEffect(() => {
+    if (!creatingServiceId) return
+    const currentLogs = services?.find((service) => service.id === creatingServiceId)?.logs
+    if (currentLogs && currentLogs.length > 0) {
+      setCreateProgressLogs(currentLogs)
+    }
   }, [creatingServiceId, services])
 
   const canCreateService =
@@ -475,6 +479,7 @@ export default function Services() {
     setCreateError(null)
     setCreatingServiceId(nextId)
     setDisplayedLogsServiceId(nextId)
+    setCreateProgressLogs([])
     try {
       await liveManager.addService({
         label: createDraft.label.trim(),
@@ -489,7 +494,20 @@ export default function Services() {
       setCreateMode("installed")
       setCreateDraft(emptyDraft())
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : "Impossible d'ajouter le service")
+      const message = error instanceof Error ? error.message : "Impossible d'ajouter le service"
+      setCreateError(message)
+      setCreateProgressLogs((current) => [
+        ...current,
+        {
+          timestamp: new Date().toLocaleTimeString("fr-FR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+          verbosity: "error",
+          content: message,
+        },
+      ])
     } finally {
       setCreatingServiceId(null)
     }
@@ -520,6 +538,7 @@ export default function Services() {
               setCreateError(null)
               setCreateMode("catalog")
               setCreateDraft(emptyDraft())
+              setCreateProgressLogs([])
               setShowCreateModal(true)
             }}
           >
@@ -769,8 +788,8 @@ export default function Services() {
                 ) : null}
               </div>
               <div style={{ maxHeight: 220, overflowY: "auto" }}>
-                {creationLogs.length > 0 ? (
-                  creationLogs.map((log, index) => (
+                {createProgressLogs.length > 0 ? (
+                  createProgressLogs.map((log, index) => (
                     <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
                   ))
                 ) : (
@@ -783,7 +802,14 @@ export default function Services() {
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowCreateModal(false)} disabled={creatingServiceId !== null}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowCreateModal(false)
+              setCreateProgressLogs([])
+            }}
+            disabled={creatingServiceId !== null}
+          >
             Annuler
           </Button>
           <Button variant="primary" onClick={() => void handleCreateService()} disabled={!canCreateService || creatingServiceId !== null}>
