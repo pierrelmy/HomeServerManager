@@ -91,6 +91,7 @@ Le flux d'ajout de service via `POST /services` accepte :
 - `startAfterInstall` pour démarrer le service juste après l'installation
 
 `installCommand` est exécuté via `sudo -n /bin/bash -lc ...`. Cette option donne un pouvoir d'exécution root très large et doit être réservée à un environnement administré.
+Dans ce mode, l’unité systemd du backend ne peut pas rester avec `ProtectSystem=strict`, sinon `apt`, `dpkg` et les écritures système nécessaires aux installateurs échoueront.
 
 Pour la VM Ubuntu de validation :
 

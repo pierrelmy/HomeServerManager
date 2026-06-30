@@ -15,7 +15,10 @@ Restart=on-failure
 RestartSec=5
 PrivateTmp=true
 ProtectHome=true
-ProtectSystem=strict
+# Le flux "Ajouter un service" peut exécuter des commandes root arbitraires
+# via `sudo -n /bin/bash -lc ...`. `ProtectSystem=strict` rendrait apt/dpkg
+# et la plupart des installateurs inopérants en lecture seule.
+ProtectSystem=false
 ReadWritePaths=/var/lib/homeservermanager
 
 [Install]

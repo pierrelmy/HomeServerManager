@@ -293,6 +293,7 @@ L'unite frontend dev fournie par le repo :
 - evite ainsi les erreurs `EROFS` rencontrees avec `vite preview`
 
 L'unite backend dev fournie par le repo n'active pas `NoNewPrivileges=true`, car le backend doit pouvoir appeler `sudo -n systemctl ...` pour les services explicitement allowlistes dans `/etc/sudoers.d/homeservermanager`.
+Elle n'utilise pas non plus `ProtectSystem=strict` si vous activez le flux d'installation de services, sinon `apt`, `dpkg` et les installateurs qui écrivent dans `/etc`, `/var/lib` ou `/var/cache` echoueront avec un filesystem en lecture seule.
 
 ## Etape 12 - Installer le script de mise a jour
 

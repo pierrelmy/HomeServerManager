@@ -9,6 +9,7 @@
    Copier aussi les scripts requis depuis `deploy/scripts` vers `/usr/local/libexec/homeservermanager`, appartenant à root et non modifiables par l’utilisateur `homelab`.
    Le flux "ajouter un service" peut maintenant exécuter directement une commande bash d’installation via `sudo -n /bin/bash -lc ...`.
    Important : le service backend ne doit pas utiliser `NoNewPrivileges=true`, sinon `sudo` ne pourra pas exécuter les commandes allowlistées.
+   Important : si vous gardez ce flux d’installation root, le backend ne peut pas non plus utiliser `ProtectSystem=strict`, sinon `apt`, `dpkg` et de nombreux installateurs échoueront en lecture seule.
 5. Copier `backend.env.example` vers `/etc/homeservermanager/backend.env`, renseigner tous les secrets et appliquer le mode `0600`.
 6. Configurer le DNS de `DOMAIN` vers l’hôte et autoriser les ports 80/443. Le port 3000 doit être limité au réseau Docker/hôte par le pare-feu.
 7. Pour Prometheus, créer `deploy/secrets/metrics_token` avec exactement la valeur de `METRICS_TOKEN`, mode `0600`.
