@@ -2,6 +2,7 @@
 # Keep this list aligned with SYSTEM_SERVICE_MAP and NAS_SCRUB_COMMAND.
 # This allows the backend to execute any root-owned installation script path via /bin/bash.
 homelab ALL=(root) NOPASSWD: /bin/bash *
+homelab ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start ollama.service
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl stop ollama.service
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl restart ollama.service
