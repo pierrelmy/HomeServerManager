@@ -282,8 +282,7 @@ ensure_demo_service() {
   tmp_script=$(mktemp)
 
   cat >"$tmp_script" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
 while true; do
   sleep 60
 done
@@ -295,7 +294,7 @@ Description=HomeServerManager demo service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/homelab-demo-service.sh
+ExecStart=/bin/sh /usr/local/bin/homelab-demo-service.sh
 Restart=always
 
 [Install]
