@@ -10,6 +10,7 @@ import TerminalPage from "./pages/Terminal"
 import ToolsPage from "./pages/Tools"
 import AccountPage from "./pages/Account"
 import SettingsPage from "./pages/Settings"
+import ServiceWebView from "./pages/ServiceWebView"
 import { HomelabRepositoryProvider } from "./data/HomelabRepositoryProvider"
 import { HomelabLiveProvider } from "./live/HomelabLiveProvider"
 import { useAuthSession } from "./hooks/useAuthSession"
@@ -28,6 +29,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/services/:serviceId/web" element={<ServiceWebView />} />
           <Route path="/docker" element={<DockerPage />} />
           <Route path="/nas" element={<NasPage />} />
           <Route path="/terminal" element={<TerminalPage />} />

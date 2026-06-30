@@ -4,11 +4,25 @@ import {
   IconPlayerPlay,
   IconAlertHexagon,
   IconPlus,
+  IconBrandDocker,
+  IconBox,
+  IconCpu,
+  IconDatabase,
+  IconServer,
+  IconShieldCheck,
+  IconBrandGithub,
+  IconNetwork,
+  IconCloudLock,
+  IconArchive,
+  IconMessageCircle,
+  IconWorldWww,
   type IconProps,
   IconLogs,
+  IconExternalLink,
 } from "@tabler/icons-react"
 import { useMemo, useState } from "react"
 import { Alert, Button, Form, Modal, Nav, Offcanvas, Spinner } from "react-bootstrap"
+import { useNavigate } from "react-router-dom"
 import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
 
@@ -20,6 +34,140 @@ interface ServiceAction {
   variant: string
 }
 
+interface KnownServiceTemplate {
+  id: string
+  label: string
+  description: string
+  serviceUnit: string
+  servicePath?: string
+  installCommand?: string
+  webUrl?: string
+  icon: React.ForwardRefExoticComponent<IconProps & React.RefAttributes<SVGSVGElement>>
+}
+
+const knownServices: KnownServiceTemplate[] = [
+  {
+    id: "ollama",
+    label: "Ollama",
+    description: "Service LLM local",
+    serviceUnit: "ollama.service",
+    servicePath: "/etc/systemd/system/ollama.service",
+    installCommand: "curl -fsSL https://ollama.com/install.sh | sh\nsystemctl enable ollama\nsystemctl start ollama",
+    webUrl: "http://127.0.0.1:11434",
+    icon: IconCpu,
+  },
+  {
+    id: "docker",
+    label: "Docker Engine",
+    description: "Moteur de conteneurs",
+    serviceUnit: "docker.service",
+    servicePath: "/lib/systemd/system/docker.service",
+    icon: IconBrandDocker,
+  },
+  {
+    id: "jenkins",
+    label: "Jenkins",
+    description: "Intégration continue",
+    serviceUnit: "jenkins.service",
+    servicePath: "/lib/systemd/system/jenkins.service",
+    installCommand: "apt-get update\napt-get install -y fontconfig openjdk-21-jre\ncurl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /usr/share/keyrings/jenkins-keyring.asc >/dev/null\necho 'deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/' > /etc/apt/sources.list.d/jenkins.list\napt-get update\napt-get install -y jenkins\nsystemctl enable jenkins\nsystemctl start jenkins",
+    webUrl: "http://127.0.0.1:8080",
+    icon: IconBox,
+  },
+  {
+    id: "postgresql",
+    label: "PostgreSQL",
+    description: "Base de données locale",
+    serviceUnit: "postgresql.service",
+    servicePath: "/lib/systemd/system/postgresql.service",
+    installCommand: "apt-get update\napt-get install -y postgresql\nsystemctl enable postgresql\nsystemctl start postgresql",
+    icon: IconDatabase,
+  },
+  {
+    id: "caddy",
+    label: "Caddy",
+    description: "Reverse proxy",
+    serviceUnit: "caddy.service",
+    servicePath: "/lib/systemd/system/caddy.service",
+    installCommand: "apt-get update\napt-get install -y debian-keyring debian-archive-keyring apt-transport-https\ncurl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg\ncurl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list\napt-get update\napt-get install -y caddy\nsystemctl enable caddy\nsystemctl start caddy",
+    webUrl: "http://127.0.0.1",
+    icon: IconServer,
+  },
+  {
+    id: "tailscale",
+    label: "Tailscale",
+    description: "Réseau privé mesh",
+    serviceUnit: "tailscaled.service",
+    servicePath: "/lib/systemd/system/tailscaled.service",
+    installCommand: "curl -fsSL https://tailscale.com/install.sh | sh\nsystemctl enable tailscaled\nsystemctl start tailscaled",
+    icon: IconShieldCheck,
+  },
+  {
+    id: "github-runner",
+    label: "GitHub Runner",
+    description: "Runner self-hosted GitHub Actions",
+    serviceUnit: "actions.runner.service",
+    servicePath: "/etc/systemd/system/actions.runner.service",
+    icon: IconBrandGithub,
+  },
+  {
+    id: "nginx",
+    label: "Nginx",
+    description: "Serveur web et reverse proxy",
+    serviceUnit: "nginx.service",
+    servicePath: "/lib/systemd/system/nginx.service",
+    installCommand: "apt-get update\napt-get install -y nginx\nsystemctl enable nginx\nsystemctl start nginx",
+    webUrl: "http://127.0.0.1",
+    icon: IconWorldWww,
+  },
+  {
+    id: "fail2ban",
+    label: "Fail2ban",
+    description: "Protection contre les tentatives d'intrusion",
+    serviceUnit: "fail2ban.service",
+    servicePath: "/lib/systemd/system/fail2ban.service",
+    installCommand: "apt-get update\napt-get install -y fail2ban\nsystemctl enable fail2ban\nsystemctl start fail2ban",
+    icon: IconCloudLock,
+  },
+  {
+    id: "netdata",
+    label: "Netdata",
+    description: "Supervision système temps réel",
+    serviceUnit: "netdata.service",
+    servicePath: "/lib/systemd/system/netdata.service",
+    installCommand: "apt-get update\napt-get install -y netdata\nsystemctl enable netdata\nsystemctl start netdata",
+    webUrl: "http://127.0.0.1:19999",
+    icon: IconNetwork,
+  },
+  {
+    id: "duplicati",
+    label: "Duplicati",
+    description: "Sauvegarde chiffrée et planifiée",
+    serviceUnit: "duplicati.service",
+    servicePath: "/etc/systemd/system/duplicati.service",
+    webUrl: "http://127.0.0.1:8200",
+    icon: IconArchive,
+  },
+  {
+    id: "mosquitto",
+    label: "Mosquitto",
+    description: "Broker MQTT léger",
+    serviceUnit: "mosquitto.service",
+    servicePath: "/lib/systemd/system/mosquitto.service",
+    installCommand: "apt-get update\napt-get install -y mosquitto mosquitto-clients\nsystemctl enable mosquitto\nsystemctl start mosquitto",
+    icon: IconMessageCircle,
+  },
+  {
+    id: "plex",
+    label: "Plex Media Server",
+    description: "Serveur multimédia",
+    serviceUnit: "plexmediaserver.service",
+    servicePath: "/lib/systemd/system/plexmediaserver.service",
+    webUrl: "http://127.0.0.1:32400/web",
+    icon: IconPlayerPlay,
+  },
+]
+
 function getServiceActions(status: ServiceStatus): ServiceAction[] {
   const actions: ServiceAction[] = [
     { id: "start", label: "Démarrer", icon: IconPlayerPlay, availableWhile: ["stopped", "failed"], variant: "primary" },
@@ -29,6 +177,10 @@ function getServiceActions(status: ServiceStatus): ServiceAction[] {
   ]
 
   return actions.filter((action) => action.availableWhile.includes(status))
+}
+
+function stopClickPropagation(event: React.MouseEvent | React.KeyboardEvent): void {
+  event.stopPropagation()
 }
 
 function capitalize(value: string): string {
@@ -48,6 +200,7 @@ function emptyDraft(): CreateServiceInput {
     serviceUnit: "",
     servicePath: "",
     installCommand: "",
+    webUrl: "",
     startAfterInstall: false,
   }
 }
@@ -57,16 +210,39 @@ function ServiceCard({
   onOpenLogs,
   onAction,
   busyAction,
+  onOpenWeb,
 }: {
   service: ServiceRecord
   onOpenLogs: (serviceId: string) => void
   onAction: (serviceId: string, action: "start" | "stop" | "restart") => void
   busyAction: string | null
+  onOpenWeb: (serviceId: string) => void
 }) {
   return (
-    <div className="d-flex flex-column border rounded p-3 bg-light">
+    <div
+      className={`d-flex flex-column border rounded p-3 bg-light ${service.webUrl ? "cursor-pointer" : ""}`}
+      role={service.webUrl ? "button" : undefined}
+      tabIndex={service.webUrl ? 0 : undefined}
+      onClick={() => {
+        if (service.webUrl) onOpenWeb(service.id)
+      }}
+      onKeyDown={(event) => {
+        if (service.webUrl && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault()
+          onOpenWeb(service.id)
+        }
+      }}
+    >
       <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-2">
-        <span className="fs-3">{service.label}</span>
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <span className="fs-3">{service.label}</span>
+          {service.webUrl ? (
+            <span className="badge text-bg-primary d-inline-flex align-items-center gap-1">
+              <IconExternalLink size={14} />
+              <span>Interface web</span>
+            </span>
+          ) : null}
+        </div>
         <div className="d-flex flex-row justify-content-center align-items-center gap-2">
           <span
             className={`rounded-circle border border-1 bg-${
@@ -93,13 +269,27 @@ function ServiceCard({
       </div>
 
       <div className="d-flex flex-wrap justify-content-start gap-2 mt-2">
+        {service.webUrl ? (
+          <Button
+            className="d-flex flex-row justify-content-center align-items-center gap-1"
+            variant="outline-primary"
+            onClick={(event) => {
+              stopClickPropagation(event)
+              onOpenWeb(service.id)
+            }}
+          >
+            <IconExternalLink size={18} />
+            <span>Ouvrir l’UI</span>
+          </Button>
+        ) : null}
         {getServiceActions(service.status).map((action) => (
           <Button
             key={action.id}
             className="d-flex flex-row justify-content-center align-items-center gap-1"
             variant={action.variant}
             disabled={busyAction === `${service.id}:${action.id}`}
-            onClick={() => {
+            onClick={(event) => {
+              stopClickPropagation(event)
               if (action.id === "see-logs") {
                 onOpenLogs(service.id)
               } else {
@@ -113,6 +303,33 @@ function ServiceCard({
         ))}
       </div>
     </div>
+  )
+}
+
+function KnownServiceCard({
+  service,
+  onSelect,
+}: {
+  service: KnownServiceTemplate
+  onSelect: (service: KnownServiceTemplate) => void
+}) {
+  return (
+    <button
+      type="button"
+      className="text-start border rounded p-3 bg-light w-100 h-100"
+      style={{ minHeight: 180 }}
+      onClick={() => onSelect(service)}
+    >
+      <div className="d-flex align-items-center gap-2 mb-2">
+        <service.icon size={24} className="text-secondary" />
+        <span className="fs-5 fw-semibold">{service.label}</span>
+      </div>
+      <div className="small text-secondary mb-3">{service.description}</div>
+      <div className="small text-muted mb-1">{service.serviceUnit}</div>
+      <div className="small text-muted">
+        {service.installCommand ? "Préremplit l’installation et le mode déjà installé." : "Préremplit le mode service déjà installé."}
+      </div>
+    </button>
   )
 }
 
@@ -151,6 +368,7 @@ export default function Services() {
   const liveManager = useHomelabLiveManager()
   const liveState = useHomelabLiveState()
   const services = useHomelabServices()
+  const navigate = useNavigate()
   const [searchStr, setSearchStr] = useState("")
   const [displayedLogsServiceId, setDisplayedLogsServiceId] = useState("")
   const [statusFilters, setStatusFilters] = useState<ServiceStatus[]>([])
@@ -159,7 +377,7 @@ export default function Services() {
   const [refreshingServices, setRefreshingServices] = useState(false)
   const [refreshingLogsFor, setRefreshingLogsFor] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createMode, setCreateMode] = useState<"installed" | "install">("installed")
+  const [createMode, setCreateMode] = useState<"catalog" | "installed" | "install">("catalog")
   const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
   const [createError, setCreateError] = useState<string | null>(null)
   const [creatingServiceId, setCreatingServiceId] = useState<string | null>(null)
@@ -233,9 +451,24 @@ export default function Services() {
   }, [creatingServiceId, services])
 
   const canCreateService =
-    createDraft.label.trim() !== ""
+    createMode !== "catalog"
+    && createDraft.label.trim() !== ""
     && createDraft.serviceUnit.trim() !== ""
     && (createMode === "installed" ? Boolean(createDraft.servicePath?.trim()) : Boolean(createDraft.installCommand?.trim()))
+
+  const applyKnownService = (service: KnownServiceTemplate) => {
+    setCreateError(null)
+    setCreateDraft({
+      label: service.label,
+      description: service.description,
+      serviceUnit: service.serviceUnit,
+      servicePath: service.servicePath ?? "",
+      installCommand: service.installCommand ?? "",
+      webUrl: service.webUrl ?? "",
+      startAfterInstall: false,
+    })
+    setCreateMode(service.installCommand ? "install" : "installed")
+  }
 
   const handleCreateService = async () => {
     const nextId = predictServiceId(createDraft.label, createDraft.serviceUnit)
@@ -249,6 +482,7 @@ export default function Services() {
         serviceUnit: createDraft.serviceUnit.trim(),
         servicePath: createMode === "installed" ? createDraft.servicePath?.trim() || undefined : undefined,
         installCommand: createMode === "install" ? createDraft.installCommand?.trim() || undefined : undefined,
+        webUrl: createDraft.webUrl?.trim() || undefined,
         startAfterInstall: createDraft.startAfterInstall,
       })
       setShowCreateModal(false)
@@ -284,7 +518,8 @@ export default function Services() {
             className="d-flex align-items-center gap-2"
             onClick={() => {
               setCreateError(null)
-              setCreateMode("installed")
+              setCreateMode("catalog")
+              setCreateDraft(emptyDraft())
               setShowCreateModal(true)
             }}
           >
@@ -346,6 +581,7 @@ export default function Services() {
                 onOpenLogs={(serviceId) => void handleOpenLogs(serviceId)}
                 onAction={(serviceId, action) => void handleAction(serviceId, action)}
                 busyAction={busyAction}
+                onOpenWeb={(serviceId) => navigate(`/services/${encodeURIComponent(serviceId)}/web`)}
               />
             ))
           )}
@@ -404,10 +640,13 @@ export default function Services() {
             variant="tabs"
             activeKey={createMode}
             onSelect={(eventKey) => {
-              if (eventKey === "installed" || eventKey === "install") setCreateMode(eventKey)
+              if (eventKey === "catalog" || eventKey === "installed" || eventKey === "install") setCreateMode(eventKey)
             }}
             className="mb-3"
           >
+            <Nav.Item>
+              <Nav.Link eventKey="catalog">Recherche un service</Nav.Link>
+            </Nav.Item>
             <Nav.Item>
               <Nav.Link eventKey="installed">Service déjà installé</Nav.Link>
             </Nav.Item>
@@ -422,6 +661,16 @@ export default function Services() {
               if (canCreateService) void handleCreateService()
             }}
           >
+            {createMode === "catalog" ? (
+              <div className="row g-3 mb-3">
+                {knownServices.map((service) => (
+                  <div key={service.id} className="col-12 col-md-6 col-xl-4">
+                    <KnownServiceCard service={service} onSelect={applyKnownService} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             <Form.Group className="mb-3">
               <Form.Label>Nom affiché</Form.Label>
               <Form.Control
@@ -451,6 +700,25 @@ export default function Services() {
               />
             </Form.Group>
 
+            <Form.Group className="mb-3">
+              <Form.Label>URL web exposée</Form.Label>
+              <Form.Control
+                value={createDraft.webUrl ?? ""}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
+                placeholder="http://127.0.0.1:8080"
+                type="url"
+              />
+              <Form.Text className="text-muted">
+                Si le service expose une interface web, elle sera ouvrable depuis la liste des services dans une iframe.
+              </Form.Text>
+            </Form.Group>
+
+            {createMode === "catalog" ? (
+              <Alert variant="light" className="mb-3">
+                Sélectionne un service connu ci-dessus pour préremplir le formulaire, puis complète ou ajuste les champs avant validation.
+              </Alert>
+            ) : null}
+
             {createMode === "installed" ? (
               <Form.Group className="mb-3">
                 <Form.Label>Chemin du service déjà installé</Form.Label>
@@ -464,7 +732,7 @@ export default function Services() {
                   Renseigne le chemin absolu du fichier `.service` déjà présent sur la machine.
                 </Form.Text>
               </Form.Group>
-            ) : (
+            ) : createMode === "install" ? (
               <Form.Group className="mb-3">
                 <Form.Label>Commande bash d'installation</Form.Label>
                 <Form.Control
@@ -479,7 +747,7 @@ export default function Services() {
                   Cette commande sera exécutée via `sudo -n /bin/bash -lc ...`. Vérifie chaque ligne avant exécution.
                 </Form.Text>
               </Form.Group>
-            )}
+            ) : null}
 
             <Form.Group className="mb-3">
               <Form.Check

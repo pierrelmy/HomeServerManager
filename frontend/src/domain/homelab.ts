@@ -51,6 +51,7 @@ export interface CreateServiceInput {
   serviceUnit: string
   servicePath?: string
   installCommand?: string
+  webUrl?: string
   startAfterInstall: boolean
 }
 
@@ -61,6 +62,7 @@ export interface ServiceRecord {
   location: string
   unit: string
   servicePath: string | null
+  webUrl: string | null
   status: ServiceStatus
   logs: ServiceLogEntry[]
 }

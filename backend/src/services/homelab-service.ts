@@ -32,9 +32,9 @@ function systemUptime(): number {
   }
 }
 
-const knownServiceMetadata: Record<string, { label: string; desc: string }> = {
-  ollama: { label: "Ollama", desc: "Service LLM local" },
-  jenkins: { label: "Jenkins", desc: "Intégration continue" },
+const knownServiceMetadata: Record<string, { label: string; desc: string; webUrl?: string }> = {
+  ollama: { label: "Ollama", desc: "Service LLM local", webUrl: "http://127.0.0.1:11434" },
+  jenkins: { label: "Jenkins", desc: "Intégration continue", webUrl: "http://127.0.0.1:8080" },
   "docker-engine": { label: "Docker Engine", desc: "Moteur de conteneurs" },
   "demo-service": { label: "Demo Service", desc: "Service systemd de test" },
 }
@@ -116,6 +116,7 @@ export class HomelabService {
         location: unit,
         unit,
         servicePath: existing?.servicePath ?? null,
+        webUrl: existing?.webUrl ?? metadata?.webUrl ?? null,
         status: existing?.status ?? "stopped",
         logs: existing?.logs ?? [],
       } satisfies ServiceRecord
@@ -246,6 +247,7 @@ export class HomelabService {
       location: input.servicePath?.trim() || input.serviceUnit.trim(),
       unit: input.serviceUnit.trim(),
       servicePath: input.servicePath?.trim() || null,
+      webUrl: input.webUrl?.trim() || null,
       status: "starting",
       logs: [],
     }

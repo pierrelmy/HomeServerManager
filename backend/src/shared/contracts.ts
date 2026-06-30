@@ -19,6 +19,7 @@ export interface ServiceRecord {
   location: string
   unit: string
   servicePath: string | null
+  webUrl: string | null
   status: ServiceStatus
   logs: ServiceLogEntry[]
 }
@@ -28,6 +29,7 @@ export const createServiceSchema = z.object({
   serviceUnit: z.string().trim().min(1).max(200),
   servicePath: z.string().trim().min(1).max(500).optional(),
   installCommand: z.string().trim().min(1).max(8_000).optional(),
+  webUrl: z.string().trim().url().max(1_000).optional(),
   startAfterInstall: z.boolean().default(false),
 }).strict().superRefine((value, ctx) => {
   if (!value.servicePath && !value.installCommand) {

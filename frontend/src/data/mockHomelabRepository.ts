@@ -132,6 +132,7 @@ export function createMockHomelabRepository(): HomelabRepository {
         location: input.servicePath ?? input.serviceUnit,
         unit: input.serviceUnit,
         servicePath: input.servicePath ?? null,
+        webUrl: input.webUrl ?? null,
         status: input.startAfterInstall ? "running" : "stopped",
         logs: [{ timestamp: "00:00:00", verbosity: "info", content: "Service simulé ajouté" }],
       }
