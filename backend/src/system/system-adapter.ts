@@ -43,7 +43,7 @@ export class SimulationSystemAdapter implements SystemAdapter {
   registerService() {}
   async addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void) {
     onLog("info", `Simulation: préparation du service ${input.serviceUnit}`)
-    if (input.installScriptPath) onLog("debug", `Simulation: script ${input.installScriptPath}`)
+    if (input.installCommand) onLog("debug", `Simulation: commande bash fournie`)
     return { servicePath: input.servicePath ?? null, status: input.startAfterInstall ? "running" : "stopped" as ServiceStatus }
   }
   async collectServiceLogs() { return null }
@@ -81,11 +81,10 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   async addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void) {
     const servicePath = input.servicePath?.trim() || null
-    const installScriptPath = input.installScriptPath?.trim() || null
+    const installCommand = input.installCommand?.trim() || null
 
     this.validateServiceUnit(input.serviceUnit)
     if (servicePath) this.validateAbsolutePath(servicePath, "servicePath")
-    if (installScriptPath) this.validateAbsolutePath(installScriptPath, "installScriptPath")
 
     onLog("info", `Vérification du service ${input.serviceUnit}`)
 
@@ -95,9 +94,9 @@ export class LocalSystemAdapter implements SystemAdapter {
       if (serviceFilePresent) onLog("info", `Fichier service détecté: ${servicePath}`)
     }
 
-    if (!serviceFilePresent && installScriptPath) {
-      onLog("info", `Exécution du script d'installation: ${installScriptPath}`)
-      await this.executeStreaming("sudo", ["-n", "/bin/bash", installScriptPath], onLog)
+    if (!serviceFilePresent && installCommand) {
+      onLog("info", "Exécution de la commande d'installation bash")
+      await this.executeStreaming("sudo", ["-n", "/bin/bash", "-lc", installCommand], onLog)
     }
 
     onLog("info", "Rechargement de systemd")

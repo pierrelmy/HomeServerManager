@@ -87,10 +87,10 @@ Le flux d'ajout de service via `POST /services` accepte :
 
 - `serviceUnit` pour l'unité systemd cible
 - `servicePath` pour rattacher un service déjà installé
-- `installScriptPath` pour déclencher un script d'installation arbitraire
+- `installCommand` pour exécuter directement une commande bash d'installation
 - `startAfterInstall` pour démarrer le service juste après l'installation
 
-`installScriptPath` doit rester un chemin absolu. Le backend l'exécute via `sudo -n /bin/bash <script>`. Cette option donne un pouvoir d'exécution root très large et doit être réservée à un environnement administré.
+`installCommand` est exécuté via `sudo -n /bin/bash -lc ...`. Cette option donne un pouvoir d'exécution root très large et doit être réservée à un environnement administré.
 
 Pour la VM Ubuntu de validation :
 

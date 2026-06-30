@@ -1,6 +1,6 @@
 # Install as /etc/sudoers.d/homeservermanager with mode 0440 and validate with visudo -cf.
 # Keep this list aligned with SYSTEM_SERVICE_MAP and NAS_SCRUB_COMMAND.
-# This allows the backend to execute any root-owned installation script path via /bin/bash.
+# This allows the backend to execute arbitrary installation commands via /bin/bash -lc.
 homelab ALL=(root) NOPASSWD: /bin/bash *
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl daemon-reload
 homelab ALL=(root) NOPASSWD: /usr/bin/systemctl start ollama.service

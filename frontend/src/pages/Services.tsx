@@ -8,7 +8,7 @@ import {
   IconLogs,
 } from "@tabler/icons-react"
 import { useMemo, useState } from "react"
-import { Alert, Button, Form, Modal, Offcanvas, Spinner } from "react-bootstrap"
+import { Alert, Button, Form, Modal, Nav, Offcanvas, Spinner } from "react-bootstrap"
 import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
 
@@ -47,7 +47,7 @@ function emptyDraft(): CreateServiceInput {
     description: "",
     serviceUnit: "",
     servicePath: "",
-    installScriptPath: "",
+    installCommand: "",
     startAfterInstall: false,
   }
 }
@@ -159,6 +159,7 @@ export default function Services() {
   const [refreshingServices, setRefreshingServices] = useState(false)
   const [refreshingLogsFor, setRefreshingLogsFor] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createMode, setCreateMode] = useState<"installed" | "install">("installed")
   const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
   const [createError, setCreateError] = useState<string | null>(null)
   const [creatingServiceId, setCreatingServiceId] = useState<string | null>(null)
@@ -234,7 +235,7 @@ export default function Services() {
   const canCreateService =
     createDraft.label.trim() !== ""
     && createDraft.serviceUnit.trim() !== ""
-    && (createDraft.servicePath?.trim() || createDraft.installScriptPath?.trim())
+    && (createMode === "installed" ? Boolean(createDraft.servicePath?.trim()) : Boolean(createDraft.installCommand?.trim()))
 
   const handleCreateService = async () => {
     const nextId = predictServiceId(createDraft.label, createDraft.serviceUnit)
@@ -246,11 +247,12 @@ export default function Services() {
         label: createDraft.label.trim(),
         description: createDraft.description?.trim() || undefined,
         serviceUnit: createDraft.serviceUnit.trim(),
-        servicePath: createDraft.servicePath?.trim() || undefined,
-        installScriptPath: createDraft.installScriptPath?.trim() || undefined,
+        servicePath: createMode === "installed" ? createDraft.servicePath?.trim() || undefined : undefined,
+        installCommand: createMode === "install" ? createDraft.installCommand?.trim() || undefined : undefined,
         startAfterInstall: createDraft.startAfterInstall,
       })
       setShowCreateModal(false)
+      setCreateMode("installed")
       setCreateDraft(emptyDraft())
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : "Impossible d'ajouter le service")
@@ -282,6 +284,7 @@ export default function Services() {
             className="d-flex align-items-center gap-2"
             onClick={() => {
               setCreateError(null)
+              setCreateMode("installed")
               setShowCreateModal(true)
             }}
           >
@@ -391,11 +394,27 @@ export default function Services() {
           <Alert variant="warning">
             <div className="fw-semibold mb-1">Avertissement sécurité</div>
             <div>
-              Le script d'installation indiqué sera exécuté sur la machine avec des privilèges élevés.
-              Toute injection, commande destructive ou script non maîtrisé peut compromettre entièrement la VM.
+              La commande bash d'installation sera exécutée sur la machine avec des privilèges élevés.
+              Toute injection, substitution non maîtrisée, expansion shell ou commande destructive peut compromettre entièrement la VM.
               Tu es responsable du contenu exécuté, de sa provenance et de ses effets.
             </div>
           </Alert>
+
+          <Nav
+            variant="tabs"
+            activeKey={createMode}
+            onSelect={(eventKey) => {
+              if (eventKey === "installed" || eventKey === "install") setCreateMode(eventKey)
+            }}
+            className="mb-3"
+          >
+            <Nav.Item>
+              <Nav.Link eventKey="installed">Service déjà installé</Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="install">Service à installer</Nav.Link>
+            </Nav.Item>
+          </Nav>
 
           <Form
             onSubmit={(event) => {
@@ -432,29 +451,35 @@ export default function Services() {
               />
             </Form.Group>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Chemin du service déjà installé</Form.Label>
-              <Form.Control
-                value={createDraft.servicePath ?? ""}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
-                placeholder="/etc/systemd/system/ollama.service"
-              />
-              <Form.Text className="text-muted">
-                Renseigne ce champ si le service existe déjà sur la machine.
-              </Form.Text>
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Script d'installation</Form.Label>
-              <Form.Control
-                value={createDraft.installScriptPath ?? ""}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, installScriptPath: event.target.value }))}
-                placeholder="/opt/scripts/install-ollama.sh"
-              />
-              <Form.Text className="text-muted">
-                Le backend accepte maintenant tout chemin absolu accessible depuis la VM. Vérifie manuellement le script avant exécution.
-              </Form.Text>
-            </Form.Group>
+            {createMode === "installed" ? (
+              <Form.Group className="mb-3">
+                <Form.Label>Chemin du service déjà installé</Form.Label>
+                <Form.Control
+                  value={createDraft.servicePath ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
+                  placeholder="/etc/systemd/system/ollama.service"
+                  required
+                />
+                <Form.Text className="text-muted">
+                  Renseigne le chemin absolu du fichier `.service` déjà présent sur la machine.
+                </Form.Text>
+              </Form.Group>
+            ) : (
+              <Form.Group className="mb-3">
+                <Form.Label>Commande bash d'installation</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={6}
+                  value={createDraft.installCommand ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, installCommand: event.target.value }))}
+                  placeholder={"curl -fsSL https://ollama.com/install.sh | sh\nsystemctl enable ollama\nsystemctl start ollama"}
+                  required
+                />
+                <Form.Text className="text-muted">
+                  Cette commande sera exécutée via `sudo -n /bin/bash -lc ...`. Vérifie chaque ligne avant exécution.
+                </Form.Text>
+              </Form.Group>
+            )}
 
             <Form.Group className="mb-3">
               <Form.Check

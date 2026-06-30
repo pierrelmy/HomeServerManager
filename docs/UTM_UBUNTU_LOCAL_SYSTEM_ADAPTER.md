@@ -33,7 +33,7 @@ Le script :
 - ne rebuild pas inutilement si le commit et les dépendances sont déjà alignés
 - redémarre les services uniquement si nécessaire
 
-Les scripts d'installation de services déclenchés depuis l'UI peuvent maintenant être n'importe quels scripts accessibles par chemin absolu sur la VM. Le backend les exécute via `sudo -n /bin/bash <script>`.
+Les services ajoutés depuis l'UI peuvent maintenant exécuter directement une commande bash d'installation. Le backend la lance via `sudo -n /bin/bash -lc ...`.
 
 Commande recommandée sur la VM :
 

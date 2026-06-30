@@ -50,7 +50,7 @@ export interface CreateServiceInput {
   description?: string
   serviceUnit: string
   servicePath?: string
-  installScriptPath?: string
+  installCommand?: string
   startAfterInstall: boolean
 }
 

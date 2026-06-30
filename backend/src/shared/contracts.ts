@@ -27,13 +27,13 @@ export const createServiceSchema = z.object({
   description: z.string().trim().max(240).optional(),
   serviceUnit: z.string().trim().min(1).max(200),
   servicePath: z.string().trim().min(1).max(500).optional(),
-  installScriptPath: z.string().trim().min(1).max(500).optional(),
+  installCommand: z.string().trim().min(1).max(8_000).optional(),
   startAfterInstall: z.boolean().default(false),
 }).strict().superRefine((value, ctx) => {
-  if (!value.servicePath && !value.installScriptPath) {
+  if (!value.servicePath && !value.installCommand) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "servicePath or installScriptPath is required",
+      message: "servicePath or installCommand is required",
       path: ["servicePath"],
     })
   }
