@@ -70,7 +70,7 @@ const knownServices: KnownServiceTemplate[] = [
     description: "Intégration continue",
     serviceUnit: "jenkins.service",
     servicePath: "/lib/systemd/system/jenkins.service",
-    installCommand: "apt-get update\napt-get install -y fontconfig openjdk-21-jre\ncurl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee /usr/share/keyrings/jenkins-keyring.asc >/dev/null\necho 'deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/' > /etc/apt/sources.list.d/jenkins.list\napt-get update\napt-get install -y jenkins\nsystemctl enable jenkins\nsystemctl start jenkins",
+    installCommand: "apt-get update\napt-get install -y fontconfig openjdk-21-jre wget\ninstall -d -m 0755 /etc/apt/keyrings\nwget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key\necho 'deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/' | tee /etc/apt/sources.list.d/jenkins.list >/dev/null\napt-get update\napt-get install -y jenkins\nsystemctl enable jenkins\nsystemctl start jenkins",
     webUrl: "http://127.0.0.1:8080",
     icon: IconBox,
   },
