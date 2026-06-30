@@ -71,6 +71,10 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
         method: "POST",
         body: JSON.stringify(input),
       }),
+    refreshServices: () =>
+      fetchJson<ServiceRecord[]>(baseUrl, "/services/refresh", { method: "POST" }),
+    refreshServiceLogs: (id: string) =>
+      fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/logs/refresh`, { method: "POST" }),
     actOnService: (id, action) =>
       fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     actOnContainer: (id, action) =>

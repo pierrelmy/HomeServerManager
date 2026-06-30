@@ -51,6 +51,8 @@ export interface HomelabLiveManager {
   updateSettings(patch: Partial<SettingsState>): Promise<SettingsState>
   changePassword(currentPassword: string, nextPassword: string): Promise<void>
   addService(input: CreateServiceInput): Promise<ServiceRecord>
+  refreshServices(): Promise<ServiceRecord[]>
+  refreshServiceLogs(id: string): Promise<ServiceRecord>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnImage(id: string, action: "pull" | "run"): Promise<void>
@@ -444,6 +446,17 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
     },
     async addService(input) {
       const nextService = await repository.addService(input)
+      services.update((current) => upsertById(current ?? [], nextService))
+      return nextService
+    },
+    async refreshServices() {
+      const nextServices = await repository.refreshServices()
+      services.setState(nextServices)
+      setReady({ lastSyncedAt: new Date().toISOString(), error: null })
+      return nextServices
+    },
+    async refreshServiceLogs(id) {
+      const nextService = await repository.refreshServiceLogs(id)
       services.update((current) => upsertById(current ?? [], nextService))
       return nextService
     },

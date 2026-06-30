@@ -276,6 +276,17 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     return audited(repository, session, "service.add", body.serviceUnit, () => service.addService(body))
   })
 
+  app.post("/services/refresh", { preHandler: requireAdmin, config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request) => {
+    const session = getSession(request)!
+    return audited(repository, session, "services.refresh", "services", () => service.refreshServices())
+  })
+
+  app.post("/services/:id/logs/refresh", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
+    const session = getSession(request)!
+    const { id } = idParamsSchema.parse(request.params)
+    return audited(repository, session, "service.logs.refresh", id, () => service.refreshServiceLogs(id))
+  })
+
   app.post("/services/:id/:action", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id, action } = serviceActionParamsSchema.parse(request.params)

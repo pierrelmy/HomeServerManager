@@ -191,6 +191,28 @@ export class HomelabService {
       : [])
   }
 
+  async refreshServices(): Promise<ServiceRecord[]> {
+    const nextServices = await this.system.collectServices(this.repository.listServices()) ?? this.repository.listServices()
+    for (const service of nextServices) {
+      this.repository.saveService(service)
+      this.events.broadcast({ type: "service.updated", service })
+    }
+    this.events.broadcast({ type: "services.updated", services: nextServices })
+    return nextServices
+  }
+
+  async refreshServiceLogs(id: string): Promise<ServiceRecord> {
+    const service = this.repository.getService(id)
+    if (!service) throw notFound(`Unknown service: ${id}`)
+    const logs = await this.system.collectServiceLogs(id, 50)
+    if (logs) {
+      service.logs = logs
+      this.repository.saveService(service)
+      this.events.broadcast({ type: "service.updated", service })
+    }
+    return service
+  }
+
   updateSettings(ownerId: string, patch: Partial<SettingsState>): SettingsState {
     const settings = { ...this.repository.getSettings(ownerId), ...patch }
     this.repository.saveSettings(ownerId, settings)
@@ -210,7 +232,7 @@ export class HomelabService {
     service.logs = [...service.logs, log].slice(-100)
     this.repository.saveService(service)
     this.events.broadcast({ type: "service.updated", service })
-    return service
+    return this.refreshServiceLogs(id)
   }
 
   async addService(input: CreateServiceInput): Promise<ServiceRecord> {

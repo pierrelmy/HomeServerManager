@@ -28,6 +28,8 @@ export interface HomelabRepository {
   updateSettings(patch: Partial<SettingsState>): Promise<SettingsState>
   changePassword(currentPassword: string, nextPassword: string): Promise<void>
   addService(input: CreateServiceInput): Promise<ServiceRecord>
+  refreshServices(): Promise<ServiceRecord[]>
+  refreshServiceLogs(id: string): Promise<ServiceRecord>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<DockerContainer>
   actOnImage(id: string, action: "pull" | "run"): Promise<DockerSnapshot>

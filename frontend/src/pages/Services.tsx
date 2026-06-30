@@ -156,6 +156,8 @@ export default function Services() {
   const [statusFilters, setStatusFilters] = useState<ServiceStatus[]>([])
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [refreshingServices, setRefreshingServices] = useState(false)
+  const [refreshingLogsFor, setRefreshingLogsFor] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -172,6 +174,31 @@ export default function Services() {
       setActionError(error instanceof Error ? error.message : "L’action sur le service a échoué")
     } finally {
       setBusyAction(null)
+    }
+  }
+
+  const handleRefreshServices = async () => {
+    setRefreshingServices(true)
+    setActionError(null)
+    try {
+      await liveManager.refreshServices()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Le rafraîchissement des services a échoué")
+    } finally {
+      setRefreshingServices(false)
+    }
+  }
+
+  const handleOpenLogs = async (serviceId: string) => {
+    setDisplayedLogsServiceId(serviceId)
+    setRefreshingLogsFor(serviceId)
+    setActionError(null)
+    try {
+      await liveManager.refreshServiceLogs(serviceId)
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Le chargement des logs a échoué")
+    } finally {
+      setRefreshingLogsFor(null)
     }
   }
 
@@ -261,8 +288,8 @@ export default function Services() {
             <IconPlus />
             <span>Ajouter un service</span>
           </Button>
-          <Button variant="outline-secondary" onClick={() => void liveManager.refreshAll()}>
-            <IconRefresh />
+          <Button variant="outline-secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
+            {refreshingServices ? <Spinner animation="border" size="sm" /> : <IconRefresh />}
           </Button>
         </div>
 
@@ -313,7 +340,7 @@ export default function Services() {
               <ServiceCard
                 key={service.id}
                 service={service}
-                onOpenLogs={setDisplayedLogsServiceId}
+                onOpenLogs={(serviceId) => void handleOpenLogs(serviceId)}
                 onAction={(serviceId, action) => void handleAction(serviceId, action)}
                 busyAction={busyAction}
               />
@@ -335,6 +362,12 @@ export default function Services() {
         </Offcanvas.Header>
         <Offcanvas.Body>
           <div>
+            {refreshingLogsFor === displayedLogsServiceId ? (
+              <Alert variant="light" className="d-flex align-items-center gap-2">
+                <Spinner animation="border" size="sm" />
+                <span>Chargement des logs système...</span>
+              </Alert>
+            ) : null}
             {displayedLogs.length > 0 ? (
               displayedLogs.map((log, index) => (
                 <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />

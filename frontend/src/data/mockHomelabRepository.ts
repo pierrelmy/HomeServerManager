@@ -138,6 +138,12 @@ export function createMockHomelabRepository(): HomelabRepository {
       services.unshift(service)
       return delay(service)
     },
+    refreshServices: async () => delay(services),
+    refreshServiceLogs: async (id) => {
+      const service = services.find((item) => item.id === id)
+      if (!service) throw new Error("Service introuvable dans le mode mock.")
+      return delay(service)
+    },
     actOnService: async (_id, _action) => {
       throw new Error("Aucun service n'est configuré dans ce mode.")
     },

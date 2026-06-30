@@ -25,6 +25,7 @@ export interface SystemAdapter {
   readonly mode: "simulation" | "local"
   registerService(id: string, unit: string): void
   addService(input: CreateServiceInput, onLog: (verbosity: LogVerbosity, content: string) => void): Promise<{ servicePath: string | null; status: ServiceStatus }>
+  collectServiceLogs(id: string, limit?: number): Promise<ServiceRecord["logs"] | null>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnImage(reference: string, action: "pull" | "run"): Promise<void>
@@ -45,6 +46,7 @@ export class SimulationSystemAdapter implements SystemAdapter {
     if (input.installScriptPath) onLog("debug", `Simulation: script ${input.installScriptPath}`)
     return { servicePath: input.servicePath ?? null, status: input.startAfterInstall ? "running" : "stopped" as ServiceStatus }
   }
+  async collectServiceLogs() { return null }
   async actOnService() {}
   async actOnContainer() {}
   async actOnImage() {}
@@ -117,6 +119,22 @@ export class LocalSystemAdapter implements SystemAdapter {
 
     const status = await this.getServiceStatusByUnit(input.serviceUnit)
     return { servicePath, status }
+  }
+
+  async collectServiceLogs(id: string, limit = 50): Promise<ServiceRecord["logs"]> {
+    const unit = this.options.serviceMap[id]
+    if (!unit) throw badRequest(`Service system mapping is missing for ${id}`)
+
+    const output = await this.executeLenient("systemctl", ["status", unit, "--no-pager", "--full", `--lines=${limit}`])
+    return output
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => ({
+        timestamp: timeStamp(),
+        verbosity: inferVerbosity(line),
+        content: line,
+      }))
+      .slice(-limit)
   }
 
   async actOnService(id: string, action: "start" | "stop" | "restart") {
@@ -244,6 +262,18 @@ export class LocalSystemAdapter implements SystemAdapter {
     }
   }
 
+  private async executeLenient(executable: string, args: string[]): Promise<string[]> {
+    try {
+      return await this.execute(executable, args)
+    } catch (error) {
+      if (error instanceof Error && "message" in error) {
+        const message = error.message.trim()
+        return message ? message.split("\n").filter(Boolean) : []
+      }
+      return []
+    }
+  }
+
   private async getServiceStatus(id: string): Promise<ServiceStatus> {
     const unit = this.options.serviceMap[id]
     if (!unit) return "failed"
@@ -252,12 +282,13 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   private async getServiceStatusByUnit(unit: string): Promise<ServiceStatus> {
     try {
-      const output = await this.execute("systemctl", ["is-active", unit])
-      const state = output[0]
+      const output = await this.execute("systemctl", ["show", unit, "--property=ActiveState", "--value"])
+      const state = output[0]?.trim()
       if (state === "active") return "running"
       if (state === "activating") return "starting"
       if (state === "deactivating") return "stopping"
       if (state === "inactive") return "stopped"
+      if (state === "failed") return "failed"
       return "failed"
     } catch {
       return "failed"
@@ -438,4 +469,16 @@ export function parseCommand(value: string, label: string): string[] {
 
 function slugFromUnit(unit: string): string {
   return unit.replace(/\.service$/, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/(^-|-$)/g, "").toLowerCase()
+}
+
+function inferVerbosity(line: string): LogVerbosity {
+  const lower = line.toLowerCase()
+  if (lower.includes("failed") || lower.includes("error")) return "error"
+  if (lower.includes("warning") || lower.includes("inactive (dead)") || lower.includes("activating")) return "warning"
+  if (lower.startsWith("loaded:") || lower.startsWith("active:") || lower.startsWith("cgroup:")) return "debug"
+  return "info"
+}
+
+function timeStamp(): string {
+  return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date())
 }
