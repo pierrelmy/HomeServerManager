@@ -44,6 +44,31 @@ run_gray() {
   "$@" 2>&1 | gray_stream
 }
 
+check_url() {
+  local url="$1"
+  local label="$2"
+  local attempts="${3:-15}"
+  local delay="${4:-1}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if curl --fail --silent "$url" >/dev/null; then
+      info "$label OK"
+      return 0
+    fi
+    sleep "$delay"
+  done
+
+  printf '%s\n' "${C_RED}ERROR:${C_RESET} $label failed after ${attempts} attempts: $url" >&2
+  return 1
+}
+
+show_service_status() {
+  step "Service status (failure context)"
+  run_gray sudo systemctl --no-pager --full status homeservermanager-backend-dev || true
+  run_gray sudo systemctl --no-pager --full status homeservermanager-frontend-dev || true
+}
+
 trap 'printf "%s\n" "${C_RED}ERROR:${C_RESET} update-hsm-dev.sh failed at line ${LINENO}.${C_RESET}" >&2' ERR
 
 step "Updating $ROOT on branch $BRANCH"
@@ -88,9 +113,9 @@ sudo systemctl restart homeservermanager-backend-dev
 sudo systemctl restart homeservermanager-frontend-dev
 
 step "Health checks"
-curl --fail --silent http://127.0.0.1:3000/health >/dev/null
-curl --fail --silent http://127.0.0.1:3000/ready >/dev/null
-curl --fail --silent http://127.0.0.1:4173 >/dev/null
+check_url http://127.0.0.1:3000/health "Backend health" || { show_service_status; exit 1; }
+check_url http://127.0.0.1:3000/ready "Backend readiness" || { show_service_status; exit 1; }
+check_url http://127.0.0.1:4173 "Frontend preview" || { show_service_status; exit 1; }
 
 step "Deployed revision"
 REVISION=$(sudo -u ubuntu bash -lc "cd '$ROOT' && git rev-parse --short HEAD")
