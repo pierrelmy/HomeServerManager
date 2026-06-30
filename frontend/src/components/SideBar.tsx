@@ -1,4 +1,5 @@
 import {
+  IconBolt,
   IconUserCircle,
   IconSettings,
   IconServer,
@@ -34,10 +35,20 @@ const bottomIcons: SideBarElement[] = [
 
 export default function Sidebar() {
   return (
-    <div
-      className="app-sidebar d-flex flex-column justify-content-between bg-white border-end flex-shrink-0"
-    >
-      <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2 p-2">
+    <aside className="app-sidebar d-flex flex-column justify-content-between flex-shrink-0">
+      <div>
+        <div className="app-sidebar__brand d-flex align-items-center gap-3">
+          <div className="app-sidebar__brand-mark">
+            <IconBolt size={20} stroke={2.2} />
+          </div>
+          <div>
+            <p className="app-sidebar__brand-title">HomeServerManager</p>
+            <p className="app-sidebar__brand-subtitle">Admin console</p>
+          </div>
+        </div>
+
+        <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2">
+          <span className="app-sidebar__group-label">Workspace</span>
         {topIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
             key={id}
@@ -45,29 +56,31 @@ export default function Sidebar() {
             path={path}
             end={path === "/"}
           >
-            <div className="d-flex flex-row align-items-center justify-content-start p-2 gap-2">
+            <div className="d-flex flex-row align-items-center justify-content-start gap-2">
               <Icon size={22} stroke={1.75} />
               <span className="fs-5">{label}</span>
             </div>
           </SidebarButton>
         ))}
+        </div>
       </div>
 
-      <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2 p-2">
+      <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2">
+        <span className="app-sidebar__group-label">Preferences</span>
         {bottomIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
             key={id}
             label={label}
             path={path}
           >
-            <div className="d-flex flex-row align-items-center justify-content-start p-2 gap-2">
+            <div className="d-flex flex-row align-items-center justify-content-start gap-2">
               <Icon size={22} stroke={1.75} />
               <span className="fs-5">{label}</span>
             </div>
           </SidebarButton>
         ))}
       </div>
-    </div>
+    </aside>
   )
 }
 

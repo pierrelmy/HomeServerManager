@@ -1,7 +1,8 @@
-import { Alert, Badge, Card, ProgressBar } from "react-bootstrap"
+import { Alert, ProgressBar } from "react-bootstrap"
 import { IconAlertCircle, IconAlertTriangle, IconClock, IconServer2 } from "@tabler/icons-react"
 import { useHomelabLiveState, useHomelabOverview } from "../live/useHomelabLive"
 import type { MetricSparkline } from "../domain/homelab"
+import { EmptyState, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge, Surface } from "../components/ui"
 
 function LoadingState() {
   return (
@@ -25,13 +26,11 @@ function MetricCard({
   accent: "info" | "warning" | "success" | "primary"
 }) {
   return (
-    <Card className="h-100">
-      <Card.Body>
-        <p className="text-secondary small mb-1">{label}</p>
-        <h3 className="mb-2">{value}</h3>
-        <ProgressBar now={percent} variant={accent} style={{ height: 7 }} />
-      </Card.Body>
-    </Card>
+    <Surface className="h-100 metric-progress">
+      <p className="text-secondary small mb-1">{label}</p>
+      <h3 className="mb-2">{value}</h3>
+      <ProgressBar now={percent} variant={accent} style={{ height: 7 }} />
+    </Surface>
   )
 }
 
@@ -59,19 +58,13 @@ export default function Home() {
   }
 
   return (
-    <div className="d-flex flex-column gap-4 p-3 p-lg-4">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
-        <div>
-          <p className="text-uppercase text-secondary small mb-1">Vue globale</p>
-          <h1 className="mb-0">{overview.hostName}</h1>
-          <p className="text-secondary mb-0">Tableau de bord synthétique pour le suivi quotidien du homelab.</p>
-        </div>
-
-        <Badge bg="light" text="dark" className="d-flex align-items-center gap-2 px-3 py-2">
-          <IconClock size={16} />
-          uptime {overview.uptime}
-        </Badge>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Overview"
+        title={overview.hostName}
+        description="Tableau de bord synthétique pour le suivi quotidien du homelab, avec capacité, alertes et activité récente."
+        actions={<StatusBadge tone="primary"><IconClock size={14} className="me-2" />uptime {overview.uptime}</StatusBadge>}
+      />
 
       <div className="row g-3">
         {overview.metrics.map((metric, index) => (
@@ -87,21 +80,27 @@ export default function Home() {
       </div>
 
       <div className="row g-3">
+        <div className="col-12 col-md-4">
+          <StatTile label="Ressources suivies" value={overview.metrics.length} meta="CPU, mémoire, réseau" tone="primary" />
+        </div>
+        <div className="col-12 col-md-4">
+          <StatTile label="Volumes visibles" value={overview.disks.length} meta="Disques et points de montage" />
+        </div>
+        <div className="col-12 col-md-4">
+          <StatTile label="Alertes actives" value={overview.alerts.length} meta="Événements nécessitant une attention" tone={overview.alerts.length > 0 ? "warning" : "success"} />
+        </div>
+      </div>
+
+      <div className="row g-3">
         <div className="col-12 col-xl-7">
-          <Card className="h-100">
-            <Card.Body>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h2 className="h5 mb-0">Disques</h2>
-                <Badge bg="light" text="dark">
-                  {overview.disks.length} disques
-                </Badge>
-              </div>
+          <Surface className="h-100">
+            <SectionTitle title="Disques" subtitle="Capacité, température et pression de stockage." trailing={<StatusBadge>{overview.disks.length} disques</StatusBadge>} />
 
               <div className="d-flex flex-column gap-3">
                 {overview.disks.length === 0 ? (
-                  <Alert variant="light" className="mb-0">Aucun disque remonté par le backend.</Alert>
+                  <EmptyState title="Aucun disque remonté par le backend." />
                 ) : overview.disks.map((disk) => (
-                  <div key={disk.name} className="border rounded p-3">
+                  <div key={disk.name} className="data-card">
                     <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
                       <div>
                         <div className="fw-semibold d-flex align-items-center gap-2">
@@ -112,25 +111,23 @@ export default function Home() {
                           {disk.used} / {disk.total} {disk.unit}
                         </div>
                       </div>
-                      <Badge bg={disk.percent >= 85 ? "warning" : "success"}>{disk.temp} °C</Badge>
+                      <StatusBadge tone={disk.percent >= 85 ? "warning" : "success"}>{disk.temp} °C</StatusBadge>
                     </div>
                     <ProgressBar now={disk.percent} variant={disk.percent >= 85 ? "warning" : "info"} className="mt-3" />
                   </div>
                 ))}
               </div>
-            </Card.Body>
-          </Card>
+          </Surface>
         </div>
 
         <div className="col-12 col-xl-5">
-          <Card className="h-100">
-            <Card.Body>
-              <h2 className="h5 mb-3">Alertes récentes</h2>
+          <Surface className="h-100">
+              <SectionTitle title="Alertes récentes" subtitle="Anomalies ou signaux à surveiller." />
               <div className="d-flex flex-column gap-2">
                 {overview.alerts.length === 0 ? (
-                  <Alert variant="light" className="mb-0">Aucune alerte.</Alert>
+                  <EmptyState title="Aucune alerte." />
                 ) : overview.alerts.map((alert) => (
-                  <div key={alert.label} className="d-flex align-items-start gap-2 p-3 border rounded">
+                  <div key={alert.label} className="data-card d-flex align-items-start gap-2">
                     {alert.level === "warning" ? (
                       <IconAlertTriangle size={16} className="text-warning mt-1" />
                     ) : (
@@ -143,33 +140,27 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            </Card.Body>
-          </Card>
+          </Surface>
         </div>
       </div>
 
-      <Card>
-        <Card.Body>
-          <div className="d-flex align-items-center justify-content-between mb-3">
-            <h2 className="h5 mb-0">Derniers logs</h2>
-            <span className="text-secondary small">Flux système agrégé</span>
-          </div>
+      <Surface>
+          <SectionTitle title="Derniers logs" subtitle="Flux système agrégé." />
 
           <div className="d-flex flex-column gap-2">
             {overview.logs.length === 0 ? (
-              <Alert variant="light" className="mb-0">Aucun log récent.</Alert>
+              <EmptyState title="Aucun log récent." />
             ) : overview.logs.map((log) => (
-              <div key={`${log.timestamp}-${log.source}`} className="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 border rounded p-3">
+              <div key={`${log.timestamp}-${log.source}`} className="data-card d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
                 <div className="d-flex align-items-center gap-2">
                   <span className="font-monospace text-secondary">{log.timestamp}</span>
-                  <Badge bg={log.level === "danger" ? "danger" : log.level === "success" ? "success" : "secondary"}>{log.source}</Badge>
+                  <StatusBadge tone={log.level === "danger" ? "danger" : log.level === "success" ? "success" : "neutral"}>{log.source}</StatusBadge>
                 </div>
                 <div className="flex-grow-1 text-md-end">{log.content}</div>
               </div>
             ))}
           </div>
-        </Card.Body>
-      </Card>
-    </div>
+      </Surface>
+    </PageShell>
   )
 }

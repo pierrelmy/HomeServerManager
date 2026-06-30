@@ -3,6 +3,7 @@ import { IconArrowLeft, IconExternalLink } from "@tabler/icons-react"
 import { Link, useParams } from "react-router-dom"
 import { useEffect, useMemo, useState } from "react"
 import { useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
+import { PageHeader, PageShell, Surface } from "../components/ui"
 
 function resolveIframeUrl(rawUrl: string): string {
   try {
@@ -72,23 +73,24 @@ export default function ServiceWebView() {
   }
 
   return (
-    <div className="d-flex flex-column h-100 w-100 p-3 gap-3">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
-        <div>
-          <div className="text-secondary small mb-1">{service.unit}</div>
-          <h1 className="mb-0">{service.label}</h1>
-        </div>
-        <div className="d-flex flex-wrap gap-2">
-          <Link to="/services" className="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
-            <IconArrowLeft size={18} />
-            <span>Retour</span>
-          </Link>
-          <Button as="a" href={iframeUrl} target="_blank" rel="noreferrer" variant="primary" className="d-inline-flex align-items-center gap-2">
-            <IconExternalLink size={18} />
-            <span>Ouvrir dans un nouvel onglet</span>
-          </Button>
-        </div>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow={service.unit}
+        title={service.label}
+        description="Tentative d’ouverture intégrée de l’interface web du service. Si le service refuse l’embed, ouvre-le dans un nouvel onglet."
+        actions={(
+          <div className="d-flex flex-wrap gap-2">
+            <Link to="/services" className="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+              <IconArrowLeft size={18} />
+              <span>Retour</span>
+            </Link>
+            <Button as="a" href={iframeUrl} target="_blank" rel="noreferrer" variant="primary" className="d-inline-flex align-items-center gap-2">
+              <IconExternalLink size={18} />
+              <span>Ouvrir dans un nouvel onglet</span>
+            </Button>
+          </div>
+        )}
+      />
 
       {iframeTimedOut && !iframeLoaded ? (
         <Alert variant="warning" className="mb-0">
@@ -107,6 +109,7 @@ export default function ServiceWebView() {
         </Alert>
       )}
 
+      <Surface>
       <div className="border rounded overflow-hidden bg-body position-relative" style={{ minHeight: "70vh" }}>
         {!iframeLoaded && !iframeTimedOut ? (
           <div
@@ -128,6 +131,7 @@ export default function ServiceWebView() {
           style={{ width: "100%", height: "100%", minHeight: "70vh", border: 0 }}
         />
       </div>
-    </div>
+      </Surface>
+    </PageShell>
   )
 }

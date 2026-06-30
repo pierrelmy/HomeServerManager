@@ -25,6 +25,7 @@ import { Alert, Button, Form, Modal, Nav, Offcanvas, Spinner } from "react-boots
 import { useNavigate } from "react-router-dom"
 import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
+import { EmptyState, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge } from "../components/ui"
 
 interface ServiceAction {
   id: "start" | "stop" | "restart" | "see-logs"
@@ -220,7 +221,7 @@ function ServiceCard({
 }) {
   return (
     <div
-      className={`d-flex flex-column border rounded p-3 bg-light ${service.webUrl ? "cursor-pointer" : ""}`}
+      className={`service-card d-flex flex-column ${service.webUrl ? "service-card--interactive cursor-pointer" : ""}`}
       role={service.webUrl ? "button" : undefined}
       tabIndex={service.webUrl ? 0 : undefined}
       onClick={() => {
@@ -237,26 +238,26 @@ function ServiceCard({
         <div className="d-flex align-items-center gap-2 flex-wrap">
           <span className="fs-3">{service.label}</span>
           {service.webUrl ? (
-            <span className="badge text-bg-primary d-inline-flex align-items-center gap-1">
+            <StatusBadge tone="primary">
               <IconExternalLink size={14} />
-              <span>Interface web</span>
-            </span>
+              <span className="ms-1">Interface web</span>
+            </StatusBadge>
           ) : null}
         </div>
         <div className="d-flex flex-row justify-content-center align-items-center gap-2">
-          <span
-            className={`rounded-circle border border-1 bg-${
+          <StatusBadge
+            tone={
               service.status === "starting" || service.status === "stopping"
                 ? "warning"
                 : service.status === "running"
                   ? "success"
                   : service.status === "stopped"
-                    ? "body-secondary"
+                    ? "neutral"
                     : "danger"
-            } d-inline-block`}
-            style={{ width: 15, height: 15 }}
-          />
-          <span className="fs-5 fw-medium">{capitalize(service.status)}</span>
+            }
+          >
+            {capitalize(service.status)}
+          </StatusBadge>
         </div>
       </div>
 
@@ -316,8 +317,7 @@ function KnownServiceCard({
   return (
     <button
       type="button"
-      className="text-start border rounded p-3 bg-light w-100 h-100"
-      style={{ minHeight: 180 }}
+      className="catalog-card"
       onClick={() => onSelect(service)}
     >
       <div className="d-flex align-items-center gap-2 mb-2">
@@ -519,93 +519,114 @@ export default function Services() {
 
   return (
     <>
-      <div className="d-flex flex-column h-100 w-100 p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <h1>Services • {services.length}</h1>
-          <div className="form flex-grow-1 flex-lg-grow-0" style={{ maxWidth: 420 }}>
+      <PageShell>
+        <PageHeader
+          eyebrow="Service registry"
+          title="Services"
+          description="Pilotage des unités systemd, ajout de services connus ou personnalisés, accès aux logs et aux interfaces web."
+          actions={(
+            <>
+              <Button
+                variant="primary"
+                className="d-flex align-items-center gap-2"
+                onClick={() => {
+                  setCreateError(null)
+                  setCreateMode("catalog")
+                  setCreateDraft(emptyDraft())
+                  setCreateProgressLogs([])
+                  setShowCreateModal(true)
+                }}
+              >
+                <IconPlus />
+                <span>Ajouter un service</span>
+              </Button>
+              <Button variant="outline-secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
+                {refreshingServices ? <Spinner animation="border" size="sm" /> : <IconRefresh />}
+              </Button>
+            </>
+          )}
+        />
+
+        <div className="row g-3">
+          <div className="col-12 col-md-4">
+            <StatTile label="Services suivis" value={services.length} meta="Inventaire courant de l’instance" tone="primary" />
+          </div>
+          <div className="col-12 col-md-4">
+            <StatTile label="En exécution" value={services.filter((service) => service.status === "running").length} meta="Unités systemd actives" tone="success" />
+          </div>
+          <div className="col-12 col-md-4">
+            <StatTile label="En anomalie" value={services.filter((service) => service.status === "failed").length} meta="Intervention potentiellement requise" tone={services.some((service) => service.status === "failed") ? "danger" : "neutral"} />
+          </div>
+        </div>
+
+        <div className="surface-card">
+          <div className="card-body d-flex flex-column gap-3">
+            <SectionTitle title="Liste des services" subtitle="Recherche, filtrage, actions d’administration et ouverture d’interface web." />
+            <div className="surface-toolbar">
+              <div className="form flex-grow-1 flex-lg-grow-0" style={{ maxWidth: 420 }}>
             <input
-              className="form-control rounded-5"
+              className="form-control search-input"
               type="search"
               placeholder="Rechercher un service"
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
             />
-          </div>
-          <Button
-            variant="primary"
-            className="d-flex align-items-center gap-2"
-            onClick={() => {
-              setCreateError(null)
-              setCreateMode("catalog")
-              setCreateDraft(emptyDraft())
-              setCreateProgressLogs([])
-              setShowCreateModal(true)
-            }}
-          >
-            <IconPlus />
-            <span>Ajouter un service</span>
-          </Button>
-          <Button variant="outline-secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
-            {refreshingServices ? <Spinner animation="border" size="sm" /> : <IconRefresh />}
-          </Button>
-        </div>
-
-        <br />
-
-        {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
-
-        <div className="d-flex flex-wrap justify-content-start align-items-center gap-3">
-          <div className="form-check d-flex align-items-center gap-2">
-            <input
-              className="form-check-input"
-              type="radio"
-              id="filterAll"
-              checked={statusFilters.length === 0}
-              onChange={() => setStatusFilters([])}
-            />
-            <label className="form-check-label fs-5 m-0" htmlFor="filterAll">
-              Tous
-            </label>
-          </div>
-          {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
-            <div key={status} className="form-check d-flex align-items-center gap-2">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id={status}
-                onChange={() =>
-                  setStatusFilters((prev) =>
-                    prev.includes(status) ? prev.filter((item) => item !== status) : [...prev, status],
-                  )
-                }
-                checked={statusFilters.includes(status)}
-              />
-              <label className="form-check-label fs-5 m-0" htmlFor={status}>
-                {capitalize(status)}
-              </label>
+              </div>
+              <div className="d-flex flex-wrap justify-content-start align-items-center gap-3">
+                <div className="form-check d-flex align-items-center gap-2">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    id="filterAll"
+                    checked={statusFilters.length === 0}
+                    onChange={() => setStatusFilters([])}
+                  />
+                  <label className="form-check-label fs-6 m-0" htmlFor="filterAll">
+                    Tous
+                  </label>
+                </div>
+                {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
+                  <div key={status} className="form-check d-flex align-items-center gap-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={status}
+                      onChange={() =>
+                        setStatusFilters((prev) =>
+                          prev.includes(status) ? prev.filter((item) => item !== status) : [...prev, status],
+                        )
+                      }
+                      checked={statusFilters.includes(status)}
+                    />
+                    <label className="form-check-label fs-6 m-0" htmlFor={status}>
+                      {capitalize(status)}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
 
-        <br />
+            {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
 
-        <div className="d-flex flex-column gap-2">
-          {displayedServices.length <= 0 ? (
-            <Alert variant="warning">Aucun service ne correspond à cette recherche</Alert>
-          ) : (
-            displayedServices.map((service) => (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                onOpenLogs={(serviceId) => void handleOpenLogs(serviceId)}
-                onAction={(serviceId, action) => void handleAction(serviceId, action)}
-                busyAction={busyAction}
-                onOpenWeb={(serviceId) => navigate(`/services/${encodeURIComponent(serviceId)}/web`)}
-              />
-            ))
-          )}
+            <div className="d-flex flex-column gap-3">
+              {displayedServices.length <= 0 ? (
+                <EmptyState title="Aucun service ne correspond à cette recherche" />
+              ) : (
+                displayedServices.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    onOpenLogs={(serviceId) => void handleOpenLogs(serviceId)}
+                    onAction={(serviceId, action) => void handleAction(serviceId, action)}
+                    busyAction={busyAction}
+                    onOpenWeb={(serviceId) => navigate(`/services/${encodeURIComponent(serviceId)}/web`)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </PageShell>
 
       <Offcanvas
         show={displayedLogsServiceId.trim() !== ""}
@@ -693,6 +714,7 @@ export default function Services() {
             <Form.Group className="mb-3">
               <Form.Label>Nom affiché</Form.Label>
               <Form.Control
+                className="surface-input"
                 value={createDraft.label}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
                 placeholder="Ollama"
@@ -703,6 +725,7 @@ export default function Services() {
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
               <Form.Control
+                className="surface-input"
                 value={createDraft.description ?? ""}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
                 placeholder="Service LLM local"
@@ -712,6 +735,7 @@ export default function Services() {
             <Form.Group className="mb-3">
               <Form.Label>Unité systemd</Form.Label>
               <Form.Control
+                className="surface-input"
                 value={createDraft.serviceUnit}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
                 placeholder="ollama.service"
@@ -722,6 +746,7 @@ export default function Services() {
             <Form.Group className="mb-3">
               <Form.Label>URL web exposée</Form.Label>
               <Form.Control
+                className="surface-input"
                 value={createDraft.webUrl ?? ""}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
                 placeholder="http://127.0.0.1:8080"
@@ -742,6 +767,7 @@ export default function Services() {
               <Form.Group className="mb-3">
                 <Form.Label>Chemin du service déjà installé</Form.Label>
                 <Form.Control
+                  className="surface-input"
                   value={createDraft.servicePath ?? ""}
                   onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
                   placeholder="/etc/systemd/system/ollama.service"
@@ -755,6 +781,7 @@ export default function Services() {
               <Form.Group className="mb-3">
                 <Form.Label>Commande bash d'installation</Form.Label>
                 <Form.Control
+                  className="surface-input"
                   as="textarea"
                   rows={6}
                   value={createDraft.installCommand ?? ""}

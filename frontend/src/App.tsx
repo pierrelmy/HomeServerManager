@@ -21,23 +21,25 @@ function AppShell() {
   const liveState = useHomelabLiveState()
 
   return (
-    <div className="app-shell d-flex flex-column flex-md-row bg-body-tertiary">
+    <div className="app-shell d-flex flex-column flex-md-row">
       <SideBar />
 
-      <main className="app-main flex-grow-1 min-vw-0 overflow-auto">
-        {liveState.error ? <Alert variant="warning" className="m-3 mb-0">{liveState.error}</Alert> : null}
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/services/:serviceId/web" element={<ServiceWebView />} />
-          <Route path="/docker" element={<DockerPage />} />
-          <Route path="/nas" element={<NasPage />} />
-          <Route path="/terminal" element={<TerminalPage />} />
-          <Route path="/tools" element={<ToolsPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+      <main className="app-main flex-grow-1 min-vw-0">
+        <div className="app-main__inner">
+          {liveState.error ? <Alert variant="warning" className="app-banner">{liveState.error}</Alert> : null}
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/services/:serviceId/web" element={<ServiceWebView />} />
+            <Route path="/docker" element={<DockerPage />} />
+            <Route path="/nas" element={<NasPage />} />
+            <Route path="/terminal" element={<TerminalPage />} />
+            <Route path="/tools" element={<ToolsPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
       </main>
     </div>
   )
