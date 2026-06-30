@@ -65,14 +65,17 @@ interface LocalSystemAdapterOptions {
   nasStatusCommand: string[]
   toolCommands: Record<string, string[]>
   timeoutMs?: number
+  installTimeoutMs?: number
 }
 
 export class LocalSystemAdapter implements SystemAdapter {
   readonly mode = "local" as const
   private readonly timeoutMs: number
+  private readonly installTimeoutMs: number
 
   constructor(private readonly options: LocalSystemAdapterOptions) {
     this.timeoutMs = options.timeoutMs ?? 30_000
+    this.installTimeoutMs = options.installTimeoutMs ?? 10 * 60_000
   }
 
   registerService(id: string, unit: string) {
@@ -96,7 +99,7 @@ export class LocalSystemAdapter implements SystemAdapter {
 
     if (!serviceFilePresent && installCommand) {
       onLog("info", "Exécution de la commande d'installation bash")
-      await this.executeStreaming("sudo", ["-n", "/bin/bash", "-lc", `set -Eeuo pipefail\n${installCommand}`], onLog)
+      await this.executeStreaming("sudo", ["-n", "/bin/bash", "-lc", `set -Eeuo pipefail\n${installCommand}`], onLog, this.installTimeoutMs)
     }
 
     onLog("info", "Rechargement de systemd")
@@ -310,15 +313,20 @@ export class LocalSystemAdapter implements SystemAdapter {
     }
   }
 
-  private async executeStreaming(executable: string, args: string[], onLog: (verbosity: LogVerbosity, content: string) => void): Promise<void> {
+  private async executeStreaming(
+    executable: string,
+    args: string[],
+    onLog: (verbosity: LogVerbosity, content: string) => void,
+    timeoutMs = this.timeoutMs,
+  ): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       const child = spawn(executable, args, {
         stdio: ["ignore", "pipe", "pipe"],
       })
       const timer = setTimeout(() => {
         child.kill("SIGTERM")
-        reject(badRequest(`${executable} ${args.join(" ")} timed out after ${this.timeoutMs}ms`))
-      }, this.timeoutMs)
+        reject(badRequest(`${executable} ${args.join(" ")} timed out after ${timeoutMs}ms`))
+      }, timeoutMs)
       let stdoutBuffer = ""
       let stderrBuffer = ""
 
