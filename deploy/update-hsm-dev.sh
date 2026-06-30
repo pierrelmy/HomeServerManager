@@ -13,6 +13,9 @@ sudo -u ubuntu bash -lc "
   git reset --hard 'origin/$BRANCH'
 "
 
+echo "==> Refreshing update script"
+install -m 0755 -o root -g root "$ROOT/deploy/update-hsm-dev.sh" /usr/local/bin/update-hsm-dev.sh
+
 echo "==> Backend install/build"
 sudo -u ubuntu bash -lc "
   cd '$ROOT/backend' &&
