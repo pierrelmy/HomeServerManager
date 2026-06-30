@@ -31,6 +31,13 @@ sudo -u ubuntu bash -lc "
 echo "==> Syncing root-owned helper scripts"
 install -m 0755 -o root -g root "$ROOT/deploy/scripts/scan-network.mjs" /usr/local/libexec/homeservermanager/scan-network
 
+echo "==> Syncing sudoers and systemd units"
+install -m 0440 -o root -g root "$ROOT/deploy/homelab-sudoers" /etc/sudoers.d/homeservermanager
+visudo -cf /etc/sudoers.d/homeservermanager >/dev/null
+install -m 0644 -o root -g root "$ROOT/deploy/homelab-backend-dev.service" /etc/systemd/system/homeservermanager-backend-dev.service
+install -m 0644 -o root -g root "$ROOT/deploy/homelab-frontend-dev.service" /etc/systemd/system/homeservermanager-frontend-dev.service
+systemctl daemon-reload
+
 echo "==> Restarting services"
 sudo systemctl restart homeservermanager-backend-dev
 sudo systemctl restart homeservermanager-frontend-dev
