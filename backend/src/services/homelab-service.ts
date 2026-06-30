@@ -270,10 +270,9 @@ export class HomelabService {
       return service
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ajout du service impossible"
-      service.status = "failed"
       this.appendServiceLog(service.id, "error", message)
-      this.repository.saveService(service)
-      this.events.broadcast({ type: "service.updated", service })
+      this.repository.removeService(service.id)
+      this.events.broadcast({ type: "service.removed", serviceId: service.id })
       throw error
     }
   }

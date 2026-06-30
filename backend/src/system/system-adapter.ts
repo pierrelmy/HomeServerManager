@@ -96,7 +96,7 @@ export class LocalSystemAdapter implements SystemAdapter {
 
     if (!serviceFilePresent && installCommand) {
       onLog("info", "Exécution de la commande d'installation bash")
-      await this.executeStreaming("sudo", ["-n", "/bin/bash", "-lc", installCommand], onLog)
+      await this.executeStreaming("sudo", ["-n", "/bin/bash", "-lc", `set -Eeuo pipefail\n${installCommand}`], onLog)
     }
 
     onLog("info", "Rechargement de systemd")

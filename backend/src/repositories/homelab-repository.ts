@@ -25,6 +25,7 @@ export interface HomelabRepository {
   replaceServices(values: ServiceRecord[]): void
   getService(id: string): ServiceRecord | undefined
   saveService(value: ServiceRecord): void
+  removeService(id: string): void
   getDocker(): DockerSnapshot
   saveDocker(value: DockerSnapshot): void
   getNas(): NasSnapshot
@@ -75,6 +76,10 @@ export class SqliteHomelabRepository implements HomelabRepository {
     const services = this.listServices()
     const index = services.findIndex((service) => service.id === value.id)
     if (index < 0) services.unshift(clone(value)); else services[index] = clone(value)
+    this.setSnapshot("services", services)
+  }
+  removeService(id: string) {
+    const services = this.listServices().filter((service) => service.id !== id)
     this.setSnapshot("services", services)
   }
   getDocker() { return this.getSnapshot<DockerSnapshot>("docker") }
@@ -192,6 +197,9 @@ export class InMemoryHomelabRepository implements HomelabRepository {
   saveService(value: ServiceRecord) {
     const index = this.services.findIndex((service) => service.id === value.id)
     if (index < 0) this.services.unshift(clone(value)); else this.services[index] = clone(value)
+  }
+  removeService(id: string) {
+    this.services = this.services.filter((service) => service.id !== id)
   }
   getDocker() { return clone(this.docker) }
   saveDocker(value: DockerSnapshot) { this.docker = clone(value) }
