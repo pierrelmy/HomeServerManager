@@ -1,7 +1,7 @@
-import { Alert, Button } from "react-bootstrap"
+import { Alert, Button, Spinner } from "react-bootstrap"
 import { IconArrowLeft, IconExternalLink } from "@tabler/icons-react"
 import { Link, useParams } from "react-router-dom"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
 
 function resolveIframeUrl(rawUrl: string): string {
@@ -20,9 +20,26 @@ export default function ServiceWebView() {
   const { serviceId = "" } = useParams()
   const liveState = useHomelabLiveState()
   const services = useHomelabServices()
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [iframeTimedOut, setIframeTimedOut] = useState(false)
 
   const service = services?.find((item) => item.id === serviceId) ?? null
   const iframeUrl = useMemo(() => service?.webUrl ? resolveIframeUrl(service.webUrl) : null, [service?.webUrl])
+
+  useEffect(() => {
+    setIframeLoaded(false)
+    setIframeTimedOut(false)
+
+    if (!iframeUrl) return
+
+    const timer = window.setTimeout(() => {
+      setIframeTimedOut(true)
+    }, 4000)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [iframeUrl])
 
   if (!liveState.ready || !services) {
     return <div className="p-3 p-lg-4">Chargement de l’interface du service...</div>
@@ -73,15 +90,41 @@ export default function ServiceWebView() {
         </div>
       </div>
 
-      <Alert variant="light" className="mb-0">
-        Si la page refuse l’affichage dans une iframe via `X-Frame-Options` ou `frame-ancestors`, utilise l’ouverture dans un nouvel onglet.
-      </Alert>
+      {iframeTimedOut && !iframeLoaded ? (
+        <Alert variant="warning" className="mb-0">
+          <div className="fw-semibold mb-1">Intégration iframe probablement refusée</div>
+          <div>
+            Ce service n’a pas chargé dans le délai attendu. C’est typiquement le cas quand il renvoie
+            `X-Frame-Options` ou `frame-ancestors`.
+          </div>
+          <div className="mt-2">
+            Ouvre plutôt l’interface dans un nouvel onglet.
+          </div>
+        </Alert>
+      ) : (
+        <Alert variant="light" className="mb-0">
+          Si la page refuse l’affichage dans une iframe via `X-Frame-Options` ou `frame-ancestors`, utilise l’ouverture dans un nouvel onglet.
+        </Alert>
+      )}
 
-      <div className="border rounded overflow-hidden bg-body" style={{ minHeight: "70vh" }}>
+      <div className="border rounded overflow-hidden bg-body position-relative" style={{ minHeight: "70vh" }}>
+        {!iframeLoaded && !iframeTimedOut ? (
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-2 bg-body"
+            style={{ zIndex: 1 }}
+          >
+            <Spinner animation="border" />
+            <span className="text-secondary">Chargement de l’interface…</span>
+          </div>
+        ) : null}
         <iframe
           key={iframeUrl}
           title={`Interface ${service.label}`}
           src={iframeUrl}
+          onLoad={() => {
+            setIframeLoaded(true)
+            setIframeTimedOut(false)
+          }}
           style={{ width: "100%", height: "100%", minHeight: "70vh", border: 0 }}
         />
       </div>
