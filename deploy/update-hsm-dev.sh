@@ -8,6 +8,7 @@ LOG_FILE=/var/lib/homeservermanager/update-hsm.log
 TOTAL_STEPS=10
 CURRENT_STEP=0
 CURRENT_LABEL="Initialisation"
+STATUS_WRITES_ENABLED=1
 
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'
@@ -55,6 +56,7 @@ json_escape() {
 }
 
 write_status() {
+  [[ "$STATUS_WRITES_ENABLED" -eq 1 ]] || return 0
   local status="$1"
   local label="$2"
   local error_message="${3:-}"
@@ -205,6 +207,7 @@ step "Deployed revision"
 REVISION=$(sudo -u ubuntu bash -lc "cd '$ROOT' && git rev-parse --short HEAD")
 info "$REVISION"
 write_status "completed" "Completed" "" "$REVISION"
+STATUS_WRITES_ENABLED=0
 
 step "Service status"
 run_gray sudo systemctl --no-pager --full status homeservermanager-backend-dev
