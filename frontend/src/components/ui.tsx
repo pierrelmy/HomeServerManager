@@ -229,6 +229,43 @@ export function Toggle({
   )
 }
 
+export function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+  size = "md",
+}: {
+  value: T
+  onChange: (value: T) => void
+  options: Array<{ value: T; label: string; icon?: ReactNode }>
+  size?: "sm" | "md"
+}) {
+  return (
+    <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900">
+      {options.map((option) => {
+        const active = option.value === value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={clsx(
+              "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition",
+              size === "sm" ? "px-2.5 py-2 text-xs" : "px-4 py-2 text-sm",
+              active
+                ? "bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-slate-50"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50",
+            )}
+          >
+            {option.icon}
+            <span>{option.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ProgressBar({ value, tone = "primary" }: { value: number; tone?: "primary" | "success" | "warning" | "danger" }) {
   const clamped = Math.max(0, Math.min(100, value))
   return (

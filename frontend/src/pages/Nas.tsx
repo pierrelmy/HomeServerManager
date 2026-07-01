@@ -35,7 +35,7 @@ export default function NasPage() {
         title="NAS"
         description="Vue d’ensemble des pools, des disques et des sauvegardes récentes."
         actions={(
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" className="flex items-center gap-2" onClick={() => void liveManager.refreshAll()}>
               <IconRefresh size={18} />
               Synchroniser
@@ -61,7 +61,7 @@ export default function NasPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Pools" subtitle="Capacité, état et température." trailing={<StatusBadge>{nas.pools.length} pools</StatusBadge>} />
 
             <div className="flex flex-col gap-3">
@@ -92,7 +92,7 @@ export default function NasPage() {
         </div>
 
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Sauvegardes récentes" subtitle="Historique des derniers jobs connus." />
             <div className="flex flex-col gap-2">
               {nas.backups.length === 0 ? (

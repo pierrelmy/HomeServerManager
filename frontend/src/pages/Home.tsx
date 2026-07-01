@@ -62,7 +62,7 @@ export default function Home() {
         eyebrow="Overview"
         title={overview.hostName}
         description="Tableau de bord synthétique pour le suivi quotidien du homelab, avec capacité, alertes et activité récente."
-        actions={<StatusBadge tone="primary"><IconClock size={14} className="me-2" />uptime {overview.uptime}</StatusBadge>}
+        actions={<StatusBadge tone="primary"><IconClock size={14} />uptime {overview.uptime}</StatusBadge>}
       />
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -92,7 +92,7 @@ export default function Home() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Disques" subtitle="Capacité, température et pression de stockage." trailing={<StatusBadge>{overview.disks.length} disques</StatusBadge>} />
 
               <div className="flex flex-col gap-3">
@@ -122,7 +122,7 @@ export default function Home() {
         </div>
 
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
               <SectionTitle title="Alertes récentes" subtitle="Anomalies ou signaux à surveiller." />
               <div className="flex flex-col gap-2">
                 {overview.alerts.length === 0 ? (

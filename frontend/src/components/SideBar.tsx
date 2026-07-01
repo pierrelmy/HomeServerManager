@@ -1,5 +1,6 @@
 import {
   IconBolt,
+  IconMoon,
   IconUserCircle,
   IconSettings,
   IconServer,
@@ -8,10 +9,13 @@ import {
   IconChartBar,
   IconTerminal2,
   IconTools,
+  IconSun,
+  IconDeviceDesktop,
   type IconProps,
 } from "@tabler/icons-react"
 import { NavLink } from "react-router-dom"
-import { useHomelabSettings } from "../live/useHomelabLive"
+import { useHomelabLiveManager, useHomelabSettings } from "../live/useHomelabLive"
+import { SegmentedControl } from "./ui"
 
 interface SideBarElement {
     id: string,
@@ -35,22 +39,43 @@ const bottomIcons: SideBarElement[] = [
 ]
 
 export default function Sidebar() {
+  const liveManager = useHomelabLiveManager()
   const settings = useHomelabSettings()
 
+  const updateTheme = async (theme: "system" | "light" | "dark") => {
+    if (!settings || settings.theme === theme) return
+    await liveManager.updateSettings({ ...settings, theme })
+  }
+
   return (
-    <aside className={`flex shrink-0 flex-col justify-between border-b border-slate-200 bg-slate-950 text-slate-300 md:min-h-screen md:border-b-0 md:border-r md:border-slate-800 ${settings?.compactSidebar ? "md:w-24" : "md:w-72"}`}>
+    <aside className={`shrink-0 border-b border-slate-200 bg-slate-950 text-slate-300 md:min-h-screen md:border-b-0 md:border-r md:border-slate-800 ${settings?.compactSidebar ? "md:w-24" : "md:w-72"}`}>
       <div>
-        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/20">
-            <IconBolt size={20} stroke={2.2} />
+        <div className="border-b border-white/10 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/20">
+              <IconBolt size={20} stroke={2.2} />
+            </div>
+            <div className={settings?.compactSidebar ? "hidden md:block" : ""}>
+              <p className="text-sm font-semibold text-white">HomeServerManager</p>
+              <p className="text-xs text-slate-400">Admin console</p>
+            </div>
           </div>
-          <div className={settings?.compactSidebar ? "hidden md:block" : ""}>
-            <p className="text-sm font-semibold text-white">HomeServerManager</p>
-            <p className="text-xs text-slate-400">Admin console</p>
+          <div className={`mt-4 ${settings?.compactSidebar ? "block md:hidden" : ""}`}>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Theme</div>
+            <SegmentedControl
+              size="sm"
+              value={settings?.theme ?? "system"}
+              onChange={updateTheme}
+              options={[
+                { value: "light", label: "Clair", icon: <IconSun size={14} /> },
+                { value: "dark", label: "Sombre", icon: <IconMoon size={14} /> },
+                { value: "system", label: "Auto", icon: <IconDeviceDesktop size={14} /> },
+              ]}
+            />
           </div>
         </div>
 
-        <div className="flex flex-row gap-2 overflow-x-auto px-3 py-4 md:flex-col">
+        <div className="grid grid-cols-2 gap-2 px-3 py-4 sm:grid-cols-3 md:flex md:flex-col">
           <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Workspace</span>
         {topIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
@@ -59,7 +84,7 @@ export default function Sidebar() {
             path={path}
             end={path === "/"}
           >
-            <div className="flex flex-row items-center justify-start gap-3">
+            <div className={`flex items-center gap-3 ${settings?.compactSidebar ? "justify-center md:justify-start" : ""}`}>
               <Icon size={22} stroke={1.75} />
               <span className={`${settings?.compactSidebar ? "hidden md:inline" : ""}`}>{label}</span>
             </div>
@@ -68,7 +93,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="flex flex-row gap-2 overflow-x-auto px-3 pb-4 md:flex-col">
+      <div className="grid grid-cols-2 gap-2 px-3 pb-4 md:flex md:flex-col">
         <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Preferences</span>
         {bottomIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
@@ -76,7 +101,7 @@ export default function Sidebar() {
             label={label}
             path={path}
           >
-            <div className="flex flex-row items-center justify-start gap-3">
+            <div className={`flex items-center gap-3 ${settings?.compactSidebar ? "justify-center md:justify-start" : ""}`}>
               <Icon size={22} stroke={1.75} />
               <span className={`${settings?.compactSidebar ? "hidden md:inline" : ""}`}>{label}</span>
             </div>
@@ -105,7 +130,7 @@ function SidebarButton({
       aria-label={label}
       title={label}
       className={({ isActive }) =>
-        `inline-flex min-w-max items-center rounded-2xl px-4 py-3 text-sm font-medium transition md:min-w-0 ${
+        `inline-flex w-full min-w-0 items-center rounded-2xl px-4 py-3 text-sm font-medium transition ${
           isActive
             ? "bg-sky-500/20 text-white ring-1 ring-inset ring-sky-400/40"
             : "text-slate-300 hover:bg-white/5 hover:text-white"

@@ -28,7 +28,7 @@ export default function TerminalPage() {
         title="Terminal"
         description="Console connectée au backend pour exécuter les commandes autorisées et lire leur sortie."
         actions={(
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <StatusBadge tone="neutral">
               <IconTerminal2 size={14} />
               {activeSession.status === "connected" ? "Session active" : activeSession.status}
@@ -43,7 +43,7 @@ export default function TerminalPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Console" subtitle="Sortie temps réel de la session active." />
             <div className="terminal-surface">
               {activeSession.lines.map((line, index) => (
@@ -81,7 +81,7 @@ export default function TerminalPage() {
         </div>
 
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Raccourcis" subtitle="Préremplit une commande dans le champ." />
             <div className="grid gap-2">
               {activeSession.quickCommands.map((quick) => (

@@ -46,8 +46,8 @@ export default function AccountPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div>
-          <Surface className="h-100">
-            <div className="mb-4 flex items-center gap-3">
+          <Surface className="h-full">
+            <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                 <IconUserCircle size={40} />
               </div>
@@ -69,7 +69,7 @@ export default function AccountPage() {
                 {account.providers.length === 0 ? (
                   <EmptyState title="Aucune méthode supplémentaire reliée." />
                 ) : account.providers.map((provider) => (
-                  <div key={provider.name} className="flex items-center justify-between gap-3">
+                    <div key={provider.name} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span className="flex items-center gap-2">
                       <IconKey size={18} />
                       {provider.name}
@@ -97,7 +97,7 @@ export default function AccountPage() {
         </div>
 
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="Clés et sessions" subtitle="Accès SSH et sessions actives remontées par le backend." />
             <div className="flex flex-col gap-3">
               <div>
@@ -109,7 +109,7 @@ export default function AccountPage() {
                   {account.sshKeys.length === 0 ? (
                     <div className="data-card text-slate-500 dark:text-slate-400">Aucune clé SSH enregistrée.</div>
                   ) : account.sshKeys.map((key) => (
-                    <div key={key.name} className="data-card flex items-center justify-between gap-3">
+                    <div key={key.name} className="data-card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">{key.name}</div>
                         <div className="text-sm text-slate-500 dark:text-slate-400">{key.fingerprint}</div>
@@ -126,7 +126,7 @@ export default function AccountPage() {
                   {account.sessions.length === 0 ? (
                     <div className="data-card text-slate-500 dark:text-slate-400">Aucune session active listée.</div>
                   ) : account.sessions.map((session) => (
-                    <div key={session.device} className="data-card flex items-center justify-between gap-3">
+                    <div key={session.device} className="data-card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="font-semibold text-slate-900 dark:text-slate-100">{session.device}</div>
                         <div className="text-sm text-slate-500 dark:text-slate-400">{session.lastSeen}</div>

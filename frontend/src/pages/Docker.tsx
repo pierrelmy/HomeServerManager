@@ -85,7 +85,7 @@ function ContainerCard({
 }) {
   return (
     <div className="data-card flex flex-col">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{container.name}</h5>
           <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(container.id)}</span>
@@ -122,7 +122,7 @@ function ImageCard({ image, busyAction, onAction }: {
 }) {
   return (
     <div className="data-card flex flex-col">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{image.name}</h5>
           <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(image.id)}</span>
@@ -150,7 +150,7 @@ function ImageCard({ image, busyAction, onAction }: {
 function VolumeCard({ volume }: { volume: DockerVolume }) {
   return (
     <div className="data-card flex flex-col">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
           <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{volume.name}</h5>
           <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(volume.id)}</span>
@@ -265,18 +265,18 @@ export default function DockerPage() {
         title="Docker"
         description="Supervision et actions courantes sur les conteneurs, images et volumes."
         actions={(
-          <>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <Input
               type="search"
               placeholder="Rechercher un conteneur, une image, un volume..."
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
-              className="max-w-[420px]"
+              className="w-full sm:min-w-[20rem] sm:max-w-[420px]"
             />
             <Button variant="secondary" onClick={() => void liveManager.refreshAll()}>
               <IconRefresh />
             </Button>
-          </>
+          </div>
         )}
       />
 

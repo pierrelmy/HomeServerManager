@@ -99,7 +99,7 @@ export default function SettingsPage() {
         </div>
 
         <div>
-          <Surface className="h-100">
+          <Surface className="h-full">
             <SectionTitle title="État courant" subtitle="Résumé des paramètres actifs." />
             <div className="mb-4 flex flex-wrap gap-2">
               <StatusBadge>{currentSettings.theme}</StatusBadge>

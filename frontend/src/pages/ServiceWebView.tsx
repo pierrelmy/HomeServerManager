@@ -95,7 +95,7 @@ export default function ServiceWebView() {
 
       {iframeTimedOut && !iframeLoaded ? (
         <Alert tone="warning">
-          <div className="fw-semibold mb-1">Intégration iframe probablement refusée</div>
+          <div className="mb-1 font-semibold">Intégration iframe probablement refusée</div>
           <div>
             Ce service n’a pas chargé dans le délai attendu. C’est typiquement le cas quand il renvoie
             `X-Frame-Options` ou `frame-ancestors`.
