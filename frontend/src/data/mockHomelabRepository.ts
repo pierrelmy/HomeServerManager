@@ -45,6 +45,17 @@ const nas: NasSnapshot = {
 const tools: ToolsSnapshot = {
   tools: [],
   recentJobs: [],
+  updateStatus: {
+    status: "idle",
+    currentStep: 0,
+    totalSteps: 0,
+    stepLabel: "",
+    startedAt: null,
+    updatedAt: null,
+    finishedAt: null,
+    revision: null,
+    error: null,
+  },
 }
 
 const terminal: TerminalSnapshot = {

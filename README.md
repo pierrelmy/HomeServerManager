@@ -50,7 +50,7 @@ SYSTEM_ADAPTER=simulation \
 SYSTEM_SERVICE_MAP='{}' \
 NAS_SCRUB_COMMAND='[]' \
 NAS_STATUS_COMMAND='[]' \
-TOOL_COMMANDS='{}' \
+TOOL_COMMANDS='{"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}' \
 METRICS_TOKEN=development-metrics-token \
 npm run dev
 ```
@@ -71,6 +71,8 @@ Application :
 - identifiants admin initiaux : `ADMIN_EMAIL` / `ADMIN_PASSWORD`
 
 En local, `SYSTEM_ADAPTER=simulation` évite toute action réelle sur Docker, systemd ou le NAS.
+
+Si vous voulez tester le bouton de mise à jour depuis l’onglet Tools avec `SYSTEM_ADAPTER=local`, ajoutez aussi `update-hsm` dans `TOOL_COMMANDS` et autorisez `/usr/local/bin/update-hsm-dev.sh` dans `sudoers`.
 
 ### Option 2 : frontend seul en mode mock
 

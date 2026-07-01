@@ -15,8 +15,8 @@ import ServiceWebView from "./pages/ServiceWebView"
 import { HomelabRepositoryProvider } from "./data/HomelabRepositoryProvider"
 import { HomelabLiveProvider } from "./live/HomelabLiveProvider"
 import { useAuthSession } from "./hooks/useAuthSession"
-import { Alert, Button, Spinner } from "./components/ui"
-import { useHomelabLiveState, useHomelabSettings } from "./live/useHomelabLive"
+import { Alert, Button, ProgressBar, Spinner, StatusBadge } from "./components/ui"
+import { useHomelabLiveState, useHomelabSettings, useHomelabTools } from "./live/useHomelabLive"
 
 function ThemeSync() {
   const settings = useHomelabSettings()
@@ -53,6 +53,7 @@ function AppShell() {
       <main className="min-w-0 flex-1">
         <div className="min-h-screen p-4 lg:p-6">
           {liveState.error ? <Alert tone="warning" className="mb-4">{liveState.error}</Alert> : null}
+          <UpdateProgressToast />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/services" element={<Services />} />
@@ -67,6 +68,54 @@ function AppShell() {
           </Routes>
         </div>
       </main>
+    </div>
+  )
+}
+
+function UpdateProgressToast() {
+  const tools = useHomelabTools()
+  const update = tools?.updateStatus
+
+  if (!update || update.status === "idle") {
+    return null
+  }
+
+  if (update.finishedAt) {
+    const elapsedMs = Date.now() - new Date(update.finishedAt).getTime()
+    if (update.status === "completed" && elapsedMs > 20_000) return null
+    if (update.status === "failed" && elapsedMs > 60_000) return null
+  }
+
+  const total = Math.max(1, update.totalSteps || 1)
+  const progress = Math.max(0, Math.min(100, Math.round((update.currentStep / total) * 100)))
+  const isRunning = update.status === "running"
+  const tone = isRunning ? "warning" : update.status === "completed" ? "success" : "danger"
+  const badgeTone = isRunning ? "warning" : update.status === "completed" ? "success" : "danger"
+  const statusLabel = isRunning ? `Étape ${Math.min(update.currentStep, total)}/${total}` : update.status === "completed" ? "Terminé" : "Échec"
+
+  return (
+    <div className="pointer-events-none fixed right-4 top-4 z-50 w-[min(28rem,calc(100vw-2rem))]">
+      <Alert tone={tone} className="pointer-events-auto shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="font-semibold">Mise à jour HomeServerManager</div>
+              <StatusBadge tone={badgeTone}>{statusLabel}</StatusBadge>
+            </div>
+            <div className="mt-2 text-sm">
+              {update.stepLabel || (isRunning ? "Exécution en cours" : update.status === "completed" ? "Déploiement terminé." : "La mise à jour a échoué.")}
+            </div>
+            <div className="mt-3">
+              <ProgressBar value={isRunning ? progress : update.status === "completed" ? 100 : progress} tone={tone === "warning" ? "warning" : tone === "success" ? "success" : "danger"} />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
+              {update.startedAt ? <span>Démarré: {new Date(update.startedAt).toLocaleTimeString("fr-FR")}</span> : null}
+              {update.revision ? <span>Révision: {update.revision}</span> : null}
+            </div>
+            {update.error ? <div className="mt-2 text-xs font-medium">{update.error}</div> : null}
+          </div>
+        </div>
+      </Alert>
     </div>
   )
 }

@@ -229,7 +229,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   app.get("/services", { preHandler: readGuard }, async () => repository.listServices())
   app.get("/docker", { preHandler: readGuard }, async () => repository.getDocker())
   app.get("/nas", { preHandler: readGuard }, async () => repository.getNas())
-  app.get("/tools", { preHandler: readGuard }, async () => repository.getTools())
+  app.get("/tools", { preHandler: readGuard }, async () => service.getToolsSnapshot())
   app.get("/terminal", { preHandler: readGuard }, async () => repository.getTerminal())
   app.get("/account", { preHandler: readGuard }, async (request) => {
     const session = getSession(request)

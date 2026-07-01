@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT=/srv/homeservermanager-dev
 BRANCH=dev
+STATUS_FILE=/var/lib/homeservermanager/update-hsm-status.json
+TOTAL_STEPS=8
+CURRENT_STEP=0
+CURRENT_LABEL="Initialisation"
 
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'
@@ -40,6 +44,30 @@ gray_stream() {
   done
 }
 
+json_escape() {
+  python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"
+}
+
+write_status() {
+  local status="$1"
+  local label="$2"
+  local error_message="${3:-}"
+  local revision="${4:-}"
+  local now
+  now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  install -d -m 0755 /var/lib/homeservermanager
+  cat >"$STATUS_FILE" <<EOF
+{"status":"$status","currentStep":$CURRENT_STEP,"totalSteps":$TOTAL_STEPS,"stepLabel":$(json_escape "$label"),"startedAt":"${STARTED_AT}","updatedAt":"${now}","finishedAt":$([ "$status" = "running" ] && printf 'null' || printf '"%s"' "$now"),"revision":$([ -n "$revision" ] && json_escape "$revision" || printf 'null'),"error":$([ -n "$error_message" ] && json_escape "$error_message" || printf 'null')}
+EOF
+}
+
+step_progress() {
+  CURRENT_STEP="$1"
+  CURRENT_LABEL="$2"
+  write_status "running" "$CURRENT_LABEL"
+  step "[$CURRENT_STEP/$TOTAL_STEPS] $CURRENT_LABEL"
+}
+
 run_gray() {
   "$@" 2>&1 | gray_stream
 }
@@ -69,9 +97,11 @@ show_service_status() {
   run_gray sudo systemctl --no-pager --full status homeservermanager-frontend-dev || true
 }
 
-trap 'printf "%s\n" "${C_RED}ERROR:${C_RESET} update-hsm-dev.sh failed at line ${LINENO}.${C_RESET}" >&2' ERR
+STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+write_status "running" "Initialisation"
+trap 'write_status "failed" "${CURRENT_LABEL}" "update-hsm-dev.sh failed at line ${LINENO}."; printf "%s\n" "${C_RED}ERROR:${C_RESET} update-hsm-dev.sh failed at line ${LINENO}.${C_RESET}" >&2' ERR
 
-step "Updating $ROOT on branch $BRANCH"
+step_progress 1 "Updating $ROOT on branch $BRANCH"
 
 run_gray sudo -u ubuntu bash -lc "
   cd '$ROOT' &&
@@ -80,17 +110,17 @@ run_gray sudo -u ubuntu bash -lc "
   git reset --hard 'origin/$BRANCH'
 "
 
-step "Refreshing update script"
+step_progress 2 "Refreshing update script"
 install -m 0755 -o root -g root "$ROOT/deploy/update-hsm-dev.sh" /usr/local/bin/update-hsm-dev.sh
 
-step "Backend install/build"
+step_progress 3 "Backend install/build"
 run_gray sudo -u ubuntu bash -lc "
   cd '$ROOT/backend' &&
   npm ci --no-audit --no-fund &&
   npm run build
 "
 
-step "Frontend install/build"
+step_progress 4 "Frontend install/build"
 run_gray sudo -u ubuntu bash -lc "
   mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
   cd '$ROOT/frontend' &&
@@ -98,21 +128,21 @@ run_gray sudo -u ubuntu bash -lc "
   npm run build
 "
 
-step "Syncing root-owned helper scripts"
+step_progress 5 "Syncing root-owned helper scripts"
 install -m 0755 -o root -g root "$ROOT/deploy/scripts/scan-network.mjs" /usr/local/libexec/homeservermanager/scan-network
 
-step "Syncing sudoers and systemd units"
+step_progress 6 "Syncing sudoers and systemd units"
 install -m 0440 -o root -g root "$ROOT/deploy/homelab-sudoers" /etc/sudoers.d/homeservermanager
 visudo -cf /etc/sudoers.d/homeservermanager >/dev/null
 install -m 0644 -o root -g root "$ROOT/deploy/homelab-backend-dev.service" /etc/systemd/system/homeservermanager-backend-dev.service
 install -m 0644 -o root -g root "$ROOT/deploy/homelab-frontend-dev.service" /etc/systemd/system/homeservermanager-frontend-dev.service
 systemctl daemon-reload
 
-step "Restarting services"
+step_progress 7 "Restarting services"
 sudo systemctl restart homeservermanager-backend-dev
 sudo systemctl restart homeservermanager-frontend-dev
 
-step "Health checks"
+step_progress 8 "Health checks"
 check_url http://127.0.0.1:3000/health "Backend health" || { show_service_status; exit 1; }
 check_url http://127.0.0.1:3000/ready "Backend readiness" || { show_service_status; exit 1; }
 check_url http://127.0.0.1:4173 "Frontend preview" || { show_service_status; exit 1; }
@@ -120,6 +150,7 @@ check_url http://127.0.0.1:4173 "Frontend preview" || { show_service_status; exi
 step "Deployed revision"
 REVISION=$(sudo -u ubuntu bash -lc "cd '$ROOT' && git rev-parse --short HEAD")
 info "$REVISION"
+write_status "completed" "Completed" "" "$REVISION"
 
 step "Service status"
 run_gray sudo systemctl --no-pager --full status homeservermanager-backend-dev

@@ -41,7 +41,7 @@ SYSTEM_ADAPTER=simulation \
 SYSTEM_SERVICE_MAP='{}' \
 NAS_SCRUB_COMMAND='[]' \
 NAS_STATUS_COMMAND='[]' \
-TOOL_COMMANDS='{}' \
+TOOL_COMMANDS='{"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}' \
 METRICS_TOKEN=development-metrics-token \
 npm run dev
 ```
@@ -80,6 +80,14 @@ Mode réservé à l’hôte de production ou à une machine explicitement prépa
 - Docker
 - les scripts NAS
 - les outils déclarés dans `TOOL_COMMANDS`
+
+Exemple pour exposer le script de mise à jour VM dans l’onglet Tools :
+
+```dotenv
+TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}
+```
+
+Le script `update-hsm-dev.sh` publie aussi un état de progression dans `/var/lib/homeservermanager/update-hsm-status.json`, utilisé par le frontend pour afficher un toast de suivi pendant le redéploiement.
 
 Ne pas utiliser ce mode sur une machine de développement standard sans avoir configuré `sudoers`, les scripts et les mappings système.
 

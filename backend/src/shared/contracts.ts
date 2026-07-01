@@ -52,9 +52,20 @@ export interface NasDrive { slot: string; model: string; temp: number; status: "
 export interface NasBackup { label: string; when: string; result: "Succès" | "Avertissement" }
 export interface NasSnapshot { capacityUsed: string; healthSummary: string; backupSummary: string; temperatureSummary: string; pools: NasPool[]; backups: NasBackup[]; drives: NasDrive[] }
 
-export interface ToolShortcut { title: string; description: string; tag: string }
+export interface ToolShortcut { id: string; title: string; description: string; tag: string }
 export interface ToolJob { label: string; when: string }
-export interface ToolsSnapshot { tools: ToolShortcut[]; recentJobs: ToolJob[] }
+export interface UpdateStatus {
+  status: "idle" | "running" | "completed" | "failed"
+  currentStep: number
+  totalSteps: number
+  stepLabel: string
+  startedAt: string | null
+  updatedAt: string | null
+  finishedAt: string | null
+  revision: string | null
+  error: string | null
+}
+export interface ToolsSnapshot { tools: ToolShortcut[]; recentJobs: ToolJob[]; updateStatus: UpdateStatus }
 
 export interface TerminalLine { command: string; output: string[]; status: "ok" | "warning" | "error"; timestamp: string }
 export interface TerminalSession { id: string; title: string; prompt: string; status: "connected" | "reconnecting" | "disconnected"; quickCommands: string[]; lines: TerminalLine[] }

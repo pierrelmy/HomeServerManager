@@ -50,3 +50,4 @@ Pour une VM Ubuntu de validation, utiliser plutôt le workflow Git dédié docum
 - backend servi via `homelab-backend-dev.service`
 - frontend buildé puis servi via `homelab-frontend-dev.service`
 - mises à jour via `sudo bash /usr/local/bin/update-hsm-dev.sh`
+- si `TOOL_COMMANDS` expose `update-hsm`, le frontend peut lancer cette mise à jour depuis l’onglet Tools avec suivi de progression

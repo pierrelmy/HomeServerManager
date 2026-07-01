@@ -265,6 +265,13 @@ ensure_scan_network() {
     0755 root root
 }
 
+ensure_update_script() {
+  install_if_changed \
+    "$ROOT/deploy/update-hsm-dev.sh" \
+    /usr/local/bin/update-hsm-dev.sh \
+    0755 root root
+}
+
 ensure_nas_status() {
   local tmp
   tmp=$(mktemp)
@@ -311,7 +318,31 @@ ensure_backend_env() {
   local vm_ip="$1"
   local backend_env="$ROOT/backend/.env"
   if [[ -f "$backend_env" ]]; then
-    log "Le backend .env existe déjà; aucun écrasement"
+    if grep -q '^TOOL_COMMANDS=' "$backend_env" && grep -q 'update-hsm' "$backend_env"; then
+      log "Le backend .env existe déjà; TOOL_COMMANDS contient update-hsm"
+      return
+    fi
+    log "Mise à jour de TOOL_COMMANDS dans backend/.env"
+    python3 - "$backend_env" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+content = path.read_text(encoding="utf-8").splitlines()
+target = 'TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}'
+replaced = False
+result = []
+for line in content:
+    if line.startswith("TOOL_COMMANDS="):
+        result.append(target)
+        replaced = True
+    else:
+        result.append(line)
+if not replaced:
+    result.append(target)
+path.write_text("\n".join(result) + "\n", encoding="utf-8")
+PY
+    chown "$VM_USER:$VM_USER" "$backend_env"
     return
   fi
 
@@ -334,7 +365,7 @@ SYSTEM_ADAPTER=local
 SYSTEM_SERVICE_MAP={"demo-service":"homelab-demo.service","docker-engine":"docker.service"}
 NAS_SCRUB_COMMAND=["/usr/bin/true"]
 NAS_STATUS_COMMAND=["/usr/local/libexec/homeservermanager/nas-status"]
-TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"]}
+TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}
 EOF
   chown "$VM_USER:$VM_USER" "$backend_env"
 }
@@ -395,6 +426,7 @@ ensure_vm_setup() {
   ensure_directories
   ensure_repo
   ensure_scan_network
+  ensure_update_script
   ensure_nas_status
   ensure_demo_service
   ensure_backend_env "$vm_ip"

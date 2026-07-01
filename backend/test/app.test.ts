@@ -82,11 +82,15 @@ describe("homelab API", () => {
     expect(toolsResponse.json()).toMatchObject({
       tools: [
         {
+          id: "scan-reseau",
           title: "Scan réseau",
           description: "Détecte les hôtes visibles et regroupe les ports courants.",
           tag: "Réseau",
         },
       ],
+      updateStatus: {
+        status: "idle",
+      },
     })
   })
 

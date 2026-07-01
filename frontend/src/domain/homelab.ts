@@ -130,6 +130,7 @@ export interface NasSnapshot {
 }
 
 export interface ToolShortcut {
+  id: string
   title: string
   description: string
   tag: string
@@ -140,9 +141,22 @@ export interface ToolJob {
   when: string
 }
 
+export interface UpdateStatus {
+  status: "idle" | "running" | "completed" | "failed"
+  currentStep: number
+  totalSteps: number
+  stepLabel: string
+  startedAt: string | null
+  updatedAt: string | null
+  finishedAt: string | null
+  revision: string | null
+  error: string | null
+}
+
 export interface ToolsSnapshot {
   tools: ToolShortcut[]
   recentJobs: ToolJob[]
+  updateStatus: UpdateStatus
 }
 
 export interface TerminalLine {

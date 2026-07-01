@@ -43,6 +43,17 @@ export const nasSeed: NasSnapshot = {
 export const toolsSeed: ToolsSnapshot = {
   tools: [],
   recentJobs: [],
+  updateStatus: {
+    status: "idle",
+    currentStep: 0,
+    totalSteps: 0,
+    stepLabel: "",
+    startedAt: null,
+    updatedAt: null,
+    finishedAt: null,
+    revision: null,
+    error: null,
+  },
 }
 
 export const terminalSeed: TerminalSnapshot = {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { readFileSync } from "node:fs"
 import { hostname, loadavg, uptime } from "node:os"
 import type { EventHub } from "../events/event-hub.js"
 import type { HomelabRepository } from "../repositories/homelab-repository.js"
@@ -8,6 +9,8 @@ import type {
   ServiceRecord,
   SettingsState,
   TerminalLine,
+  ToolsSnapshot,
+  UpdateStatus,
 } from "../shared/contracts.js"
 import { conflict, notFound } from "../shared/errors.js"
 import type { SystemAdapter } from "../system/system-adapter.js"
@@ -70,6 +73,27 @@ const knownToolMetadata: Record<string, { title: string; description: string; ta
     description: "Compile un état synthétique des alertes et des tendances.",
     tag: "Synthèse",
   },
+  "update-hsm": {
+    title: "Update HSM",
+    description: "Lance le script de mise à jour, rebuild et redémarrage des services.",
+    tag: "Maintenance",
+  },
+}
+
+const UPDATE_STATUS_PATH = "/var/lib/homeservermanager/update-hsm-status.json"
+
+function idleUpdateStatus(): UpdateStatus {
+  return {
+    status: "idle",
+    currentStep: 0,
+    totalSteps: 0,
+    stepLabel: "",
+    startedAt: null,
+    updatedAt: null,
+    finishedAt: null,
+    revision: null,
+    error: null,
+  }
 }
 
 function humanizeId(value: string): string {
@@ -94,7 +118,7 @@ export class HomelabService {
       services: this.repository.listServices(),
       docker: this.repository.getDocker(),
       nas: this.repository.getNas(),
-      tools: this.repository.getTools(),
+      tools: this.getToolsSnapshot(),
       account: this.repository.getAccount(),
       settings: this.repository.getSettings(ownerId),
       terminal: this.repository.getTerminal(),
@@ -129,12 +153,13 @@ export class HomelabService {
       })
     this.repository.replaceServices([...configuredServices, ...dynamicServices])
 
-    const currentTools = this.repository.getTools()
+    const currentTools = this.getToolsSnapshot()
     const nextTools = {
       ...currentTools,
       tools: Object.keys(toolCommands).map((id) => {
         const metadata = knownToolMetadata[id]
         return {
+          id,
           title: metadata?.title ?? humanizeId(id),
           description: metadata?.description ?? `Commande locale configurée pour ${id}.`,
           tag: metadata?.tag ?? "Support",
@@ -163,6 +188,7 @@ export class HomelabService {
   async refreshSystemState(): Promise<Error[]> {
     this.refreshOverview()
     if (this.system.mode !== "local") return []
+    this.syncUpdateStatus()
 
     const results = await Promise.allSettled([
       this.system.collectOverview(this.repository.getOverview()),
@@ -312,7 +338,7 @@ export class HomelabService {
 
   async runNasScrub() {
     await this.system.runNasScrub()
-    const tools = this.repository.getTools()
+    const tools = this.getToolsSnapshot()
     const job = { label: "Scrub NAS - démarré", when: relativeDate() }
     tools.recentJobs = [job, ...tools.recentJobs].slice(0, 20)
     this.repository.saveTools(tools)
@@ -322,15 +348,67 @@ export class HomelabService {
   }
 
   async runTool(id: string) {
-    const tools = this.repository.getTools()
-    const tool = tools.tools.find((item) => slug(item.title) === id)
+    const tools = this.getToolsSnapshot()
+    const tool = tools.tools.find((item) => item.id === id)
     if (!tool) throw notFound(`Unknown tool: ${id}`)
+    if (id === "update-hsm") {
+      tools.updateStatus = {
+        status: "running",
+        currentStep: 0,
+        totalSteps: 8,
+        stepLabel: "Initialisation",
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        finishedAt: null,
+        revision: null,
+        error: null,
+      }
+      this.repository.saveTools(tools)
+      this.events.broadcast({ type: "tools.updated", tools })
+    }
     await this.system.runTool(id)
-    const job = { label: `${tool.title} - succès`, when: relativeDate() }
+    const job = {
+      label: id === "update-hsm" ? `${tool.title} - démarré` : `${tool.title} - succès`,
+      when: relativeDate(),
+    }
     tools.recentJobs = [job, ...tools.recentJobs].slice(0, 20)
     this.repository.saveTools(tools)
     this.events.broadcast({ type: "tools.updated", tools })
     return job
+  }
+
+  getToolsSnapshot(): ToolsSnapshot {
+    const tools = this.repository.getTools()
+    const updateStatus = this.readUpdateStatusFile() ?? tools.updateStatus ?? idleUpdateStatus()
+    if (JSON.stringify(tools.updateStatus) !== JSON.stringify(updateStatus)) {
+      tools.updateStatus = updateStatus
+      this.repository.saveTools(tools)
+    }
+    return tools
+  }
+
+  private syncUpdateStatus(): void {
+    const tools = this.getToolsSnapshot()
+    this.events.broadcast({ type: "tools.updated", tools })
+  }
+
+  private readUpdateStatusFile(): UpdateStatus | null {
+    try {
+      const parsed = JSON.parse(readFileSync(UPDATE_STATUS_PATH, "utf8")) as Partial<UpdateStatus>
+      return {
+        status: parsed.status === "running" || parsed.status === "completed" || parsed.status === "failed" ? parsed.status : "idle",
+        currentStep: typeof parsed.currentStep === "number" ? Math.max(0, parsed.currentStep) : 0,
+        totalSteps: typeof parsed.totalSteps === "number" ? Math.max(0, parsed.totalSteps) : 0,
+        stepLabel: typeof parsed.stepLabel === "string" ? parsed.stepLabel : "",
+        startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : null,
+        updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null,
+        finishedAt: typeof parsed.finishedAt === "string" ? parsed.finishedAt : null,
+        revision: typeof parsed.revision === "string" ? parsed.revision : null,
+        error: typeof parsed.error === "string" ? parsed.error : null,
+      }
+    } catch {
+      return null
+    }
   }
 
   private appendServiceLog(serviceId: string, verbosity: "debug" | "info" | "warning" | "error", content: string): void {

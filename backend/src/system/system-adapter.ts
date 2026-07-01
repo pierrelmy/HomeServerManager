@@ -159,7 +159,12 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   async runTool(id: string) {
-    await this.executeConfigured(this.options.toolCommands[id] ?? [], `tool ${id}`)
+    const command = this.options.toolCommands[id] ?? []
+    if (id === "update-hsm") {
+      await this.executeDetached(command, `tool ${id}`)
+      return
+    }
+    await this.executeConfigured(command, `tool ${id}`)
   }
 
   async executeTerminal(command: string): Promise<CommandResult> {
@@ -243,6 +248,23 @@ export class LocalSystemAdapter implements SystemAdapter {
     const [executable, ...args] = command
     if (!executable) throw badRequest(`Command mapping is missing for ${label}`)
     return this.execute(executable, args)
+  }
+
+  private async executeDetached(command: string[], label: string): Promise<void> {
+    const [executable, ...args] = command
+    if (!executable) throw badRequest(`Command mapping is missing for ${label}`)
+
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(executable, args, {
+        detached: true,
+        stdio: "ignore",
+      })
+      child.once("error", reject)
+      child.once("spawn", () => {
+        child.unref()
+        resolve()
+      })
+    })
   }
 
   private async execute(executable: string, args: string[]): Promise<string[]> {
