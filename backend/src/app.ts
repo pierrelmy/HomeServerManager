@@ -92,6 +92,7 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
   await app.register(cookie, { secret: config.sessionSecret, hook: "onRequest" })
   await app.register(cors, {
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PATCH", "DELETE", "OPTIONS"],
     origin(origin, callback) {
       callback(null, isAllowedOrigin(origin, config))
     },

@@ -119,6 +119,22 @@ describe("homelab API", () => {
     expect(response.headers["access-control-allow-origin"]).toBe("http://host-001.lan:5173")
   })
 
+  it("allows PATCH preflight requests for settings", async () => {
+    const instance = await setup()
+    const response = await instance.app.inject({
+      method: "OPTIONS",
+      url: "/settings",
+      headers: {
+        origin: "http://192.168.64.6:4173",
+        "access-control-request-method": "PATCH",
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers["access-control-allow-origin"]).toBe("http://192.168.64.6:4173")
+    expect(String(response.headers["access-control-allow-methods"] ?? "")).toContain("PATCH")
+  })
+
   it("keeps origin checks strict in production", async () => {
     built = await buildApp({
       ...config,
