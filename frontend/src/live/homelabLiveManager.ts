@@ -58,6 +58,7 @@ export interface HomelabLiveManager {
   actOnImage(id: string, action: "pull" | "run"): Promise<void>
   runNasScrub(): Promise<void>
   runTool(id: string): Promise<void>
+  refreshTools(): Promise<void>
   executeTerminalCommand(command: string): void
   requestRefresh(scope: keyof HomelabLiveBundle | "all"): void
 }
@@ -481,6 +482,9 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
     },
     async runTool(id) {
       await repository.runTool(id)
+      tools.setState(await repository.getToolsSnapshot())
+    },
+    async refreshTools() {
       tools.setState(await repository.getToolsSnapshot())
     },
     executeTerminalCommand(command: string) {

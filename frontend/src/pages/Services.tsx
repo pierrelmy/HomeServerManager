@@ -218,9 +218,18 @@ function ServiceCard({
   busyAction: string | null
   onOpenWeb: (serviceId: string) => void
 }) {
+  const statusTone =
+    service.status === "starting" || service.status === "stopping"
+      ? "warning"
+      : service.status === "running"
+        ? "success"
+        : service.status === "stopped"
+          ? "neutral"
+          : "danger"
+
   return (
     <div
-      className={`service-card flex flex-col ${service.webUrl ? "service-card--interactive cursor-pointer" : ""}`}
+      className={`service-card flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition dark:border-slate-800 dark:bg-slate-900 ${service.webUrl ? "service-card--interactive cursor-pointer hover:border-sky-300 hover:shadow-md dark:hover:border-sky-700" : ""}`}
       role={service.webUrl ? "button" : undefined}
       tabIndex={service.webUrl ? 0 : undefined}
       onClick={() => {
@@ -233,42 +242,29 @@ function ServiceCard({
         }
       }}
     >
-      <div className="flex flex-col items-start justify-between gap-2 lg:flex-row lg:items-center">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-2xl font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xl font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
+            <StatusBadge tone={statusTone}>{capitalize(service.status)}</StatusBadge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{service.desc}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 lg:min-w-[15rem]">
+          <div className="truncate font-medium text-slate-700 dark:text-slate-200">{service.unit}</div>
+          <div className="mt-1 break-all text-xs">{service.servicePath ?? service.location}</div>
           {service.webUrl ? (
-            <StatusBadge tone="primary">
-              <IconExternalLink size={14} />
-              <span>Interface web</span>
-            </StatusBadge>
+            <div className="mt-2 inline-flex">
+              <StatusBadge tone="primary">
+                <IconExternalLink size={14} />
+                <span>Interface web</span>
+              </StatusBadge>
+            </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge
-            tone={
-              service.status === "starting" || service.status === "stopping"
-                ? "warning"
-                : service.status === "running"
-                  ? "success"
-                  : service.status === "stopped"
-                    ? "neutral"
-                    : "danger"
-            }
-          >
-            {capitalize(service.status)}
-          </StatusBadge>
-        </div>
       </div>
 
-      <div className="flex flex-col justify-between gap-2 lg:flex-row">
-        <span className="text-slate-600 dark:text-slate-300">{service.desc}</span>
-        <div className="flex flex-col text-sm text-slate-500 dark:text-slate-400 lg:text-right">
-          <span>{service.unit}</span>
-          {service.servicePath ? <span className="text-xs">{service.servicePath}</span> : <span className="text-xs">{service.location}</span>}
-        </div>
-      </div>
-
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-start">
+      <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 dark:border-slate-800 sm:flex-row sm:flex-wrap">
         {service.webUrl ? (
           <Button
             className="flex w-full items-center gap-1 sm:w-auto"
@@ -316,16 +312,20 @@ function KnownServiceCard({
   return (
     <button
       type="button"
-      className="catalog-card"
+      className="catalog-card h-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
       onClick={() => onSelect(service)}
     >
-      <div className="mb-2 flex items-center gap-2">
-        <service.icon size={24} className="text-slate-500 dark:text-slate-400" />
-        <span className="text-lg font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
+      <div className="mb-3 flex items-center gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+          <service.icon size={22} className="text-slate-600 dark:text-slate-300" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-lg font-semibold text-slate-950 dark:text-slate-50">{service.label}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">{service.serviceUnit}</div>
+        </div>
       </div>
-      <div className="mb-3 text-sm text-slate-600 dark:text-slate-300">{service.description}</div>
-      <div className="mb-1 text-sm text-slate-500 dark:text-slate-400">{service.serviceUnit}</div>
-      <div className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">{service.description}</div>
+      <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
         {service.installCommand ? "Préremplit l’installation et le mode déjà installé." : "Préremplit le mode service déjà installé."}
       </div>
     </button>
@@ -561,19 +561,19 @@ export default function Services() {
           </div>
         </div>
 
-        <Surface className="flex flex-col gap-3">
+        <Surface className="flex flex-col gap-5">
             <SectionTitle title="Liste des services" subtitle="Recherche, filtrage, actions d’administration et ouverture d’interface web." />
-            <div className="surface-toolbar">
-              <div className="flex-1 lg:max-w-[420px]">
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[minmax(0,420px)_1fr]">
+              <div className="min-w-0">
             <Input
               type="search"
-              placeholder="Rechercher un service"
+              placeholder="Rechercher par nom, description, statut ou unité"
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
             />
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   <input
                     className="h-4 w-4 rounded border-slate-300 accent-sky-600"
                     type="radio"
@@ -584,7 +584,7 @@ export default function Services() {
                   <span>Tous</span>
                 </label>
                 {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
-                  <label key={status} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <label key={status} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                     <input
                       className="h-4 w-4 rounded border-slate-300 accent-sky-600"
                       type="checkbox"
@@ -604,7 +604,7 @@ export default function Services() {
 
             {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {displayedServices.length <= 0 ? (
                 <EmptyState title="Aucun service ne correspond à cette recherche" />
               ) : (
@@ -624,31 +624,36 @@ export default function Services() {
       </PageShell>
 
       {displayedLogsServiceId.trim() !== "" ? (
-      <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/50">
-        <div className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+      <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/60 backdrop-blur-sm">
+        <div className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="text-lg font-semibold text-slate-950 dark:text-slate-50">
-            {services.find((service) => service.id === displayedLogsServiceId)?.label ?? "Unknown service"}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Logs service</div>
+              <div className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-50">
+                {services.find((service) => service.id === displayedLogsServiceId)?.label ?? "Unknown service"}
+              </div>
             </div>
             <Button variant="secondary" onClick={() => setDisplayedLogsServiceId("")}>Fermer</Button>
           </div>
-          <div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
             {refreshingLogsFor === displayedLogsServiceId ? (
               <Alert tone="neutral" className="mb-3 flex items-center gap-2">
                 <Spinner />
                 <span>Chargement des logs système...</span>
               </Alert>
             ) : null}
-            {displayedLogs.length > 0 ? (
-              displayedLogs.map((log, index) => (
-                <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
-              ))
-            ) : (
-              <Alert tone="warning" className="flex items-center gap-2">
-                <IconAlertHexagon />
-                <span>Aucun log disponible</span>
-              </Alert>
-            )}
+            <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">
+              {displayedLogs.length > 0 ? (
+                displayedLogs.map((log, index) => (
+                  <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
+                ))
+              ) : (
+                <Alert tone="warning" className="flex items-center gap-2">
+                  <IconAlertHexagon />
+                  <span>Aucun log disponible</span>
+                </Alert>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -671,7 +676,7 @@ export default function Services() {
             </div>
           </Alert>
 
-          <div className="mb-4 grid gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 sm:inline-flex">
+          <div className="mb-6 grid gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 sm:inline-flex">
             {[
               ["catalog", "Recherche un service"],
               ["installed", "Service déjà installé"],
@@ -708,47 +713,49 @@ export default function Services() {
               </div>
             ) : null}
 
-            <label className="mb-3 block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nom affiché</span>
-              <Input
-                value={createDraft.label}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
-                placeholder="Ollama"
-                required
-              />
-            </label>
+            <div className="mb-4 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nom affiché</span>
+                <Input
+                  value={createDraft.label}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
+                  placeholder="Ollama"
+                  required
+                />
+              </label>
 
-            <label className="mb-3 block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Description</span>
-              <Input
-                value={createDraft.description ?? ""}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
-                placeholder="Service LLM local"
-              />
-            </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Unité systemd</span>
+                <Input
+                  value={createDraft.serviceUnit}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
+                  placeholder="ollama.service"
+                  required
+                />
+              </label>
 
-            <label className="mb-3 block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Unité systemd</span>
-              <Input
-                value={createDraft.serviceUnit}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
-                placeholder="ollama.service"
-                required
-              />
-            </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Description</span>
+                <Input
+                  value={createDraft.description ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Service LLM local"
+                />
+              </label>
 
-            <label className="mb-3 block">
-              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">URL web exposée</span>
-              <Input
-                value={createDraft.webUrl ?? ""}
-                onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
-                placeholder="http://127.0.0.1:8080"
-                type="url"
-              />
-              <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
-                Si le service expose une interface web, elle sera ouvrable depuis la liste des services dans une iframe.
-              </span>
-            </label>
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">URL web exposée</span>
+                <Input
+                  value={createDraft.webUrl ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
+                  placeholder="http://127.0.0.1:8080"
+                  type="url"
+                />
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
+                  Si le service expose une interface web, elle sera ouvrable depuis la liste des services dans une iframe.
+                </span>
+              </label>
+            </div>
 
             {createMode === "catalog" ? (
               <Alert tone="neutral" className="mb-3">
@@ -795,7 +802,7 @@ export default function Services() {
               <span>Démarrer le service après installation</span>
             </label>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="font-semibold text-slate-900 dark:text-slate-100">Progression</span>
                 {creatingServiceId ? (
@@ -805,7 +812,7 @@ export default function Services() {
                   </span>
                 ) : null}
               </div>
-              <div className="max-h-[220px] overflow-y-auto">
+              <div className="max-h-[220px] overflow-y-auto rounded-xl bg-white p-3 dark:bg-slate-950">
                 {createProgressLogs.length > 0 ? (
                   createProgressLogs.map((log, index) => (
                     <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />

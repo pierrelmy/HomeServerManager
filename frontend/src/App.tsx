@@ -16,7 +16,7 @@ import { HomelabRepositoryProvider } from "./data/HomelabRepositoryProvider"
 import { HomelabLiveProvider } from "./live/HomelabLiveProvider"
 import { useAuthSession } from "./hooks/useAuthSession"
 import { Alert, Button, ProgressBar, Spinner, StatusBadge } from "./components/ui"
-import { useHomelabLiveState, useHomelabSettings, useHomelabTools } from "./live/useHomelabLive"
+import { useHomelabLiveManager, useHomelabLiveState, useHomelabSettings, useHomelabTools } from "./live/useHomelabLive"
 
 function ThemeSync() {
   const settings = useHomelabSettings()
@@ -73,8 +73,21 @@ function AppShell() {
 }
 
 function UpdateProgressToast() {
+  const liveManager = useHomelabLiveManager()
   const tools = useHomelabTools()
   const update = tools?.updateStatus
+
+  useEffect(() => {
+    if (!update || update.status === "idle") {
+      return
+    }
+
+    const interval = window.setInterval(() => {
+      void liveManager.refreshTools()
+    }, update.status === "running" ? 2000 : 5000)
+
+    return () => window.clearInterval(interval)
+  }, [liveManager, update?.status])
 
   if (!update || update.status === "idle") {
     return null
@@ -95,7 +108,10 @@ function UpdateProgressToast() {
 
   return (
     <div className="pointer-events-none fixed right-4 top-4 z-50 w-[min(28rem,calc(100vw-2rem))]">
-      <Alert tone={tone} className="pointer-events-auto shadow-lg">
+      <Alert
+        tone={tone}
+        className="pointer-events-auto border shadow-2xl backdrop-blur-sm bg-white/95 dark:bg-slate-950/95"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
