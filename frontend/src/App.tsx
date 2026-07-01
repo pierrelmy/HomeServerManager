@@ -47,7 +47,7 @@ function AppShell() {
   const liveState = useHomelabLiveState()
 
   return (
-    <div className="min-h-screen md:flex">
+    <div className="min-h-screen md:flex md:items-start">
       <SideBar />
 
       <main className="min-w-0 flex-1">

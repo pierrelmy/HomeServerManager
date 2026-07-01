@@ -48,20 +48,22 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className={`shrink-0 border-b border-slate-200 bg-slate-950 text-slate-300 md:min-h-screen md:border-b-0 md:border-r md:border-slate-800 ${settings?.compactSidebar ? "md:w-24" : "md:w-72"}`}>
-      <div>
-        <div className="border-b border-white/10 px-4 py-4">
+    <aside
+      className={`shrink-0 border-b border-slate-200 bg-white text-slate-700 md:sticky md:top-0 md:h-screen md:self-start md:overflow-y-auto md:border-b-0 md:border-r dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${settings?.compactSidebar ? "md:w-24" : "md:w-72"}`}
+    >
+      <div className="flex flex-col md:min-h-screen">
+        <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/20">
               <IconBolt size={20} stroke={2.2} />
             </div>
             <div className={settings?.compactSidebar ? "hidden md:block" : ""}>
-              <p className="text-sm font-semibold text-white">HomeServerManager</p>
-              <p className="text-xs text-slate-400">Admin console</p>
+              <p className="text-sm font-semibold text-slate-950 dark:text-white">HomeServerManager</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Admin console</p>
             </div>
           </div>
           <div className={`mt-4 ${settings?.compactSidebar ? "block md:hidden" : ""}`}>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Theme</div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">Theme</div>
             <SegmentedControl
               size="sm"
               value={settings?.theme ?? "system"}
@@ -75,7 +77,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 px-3 py-4 sm:grid-cols-3 md:flex md:flex-col">
+        <div className="grid grid-cols-2 gap-2 px-3 py-4 sm:grid-cols-3 md:flex md:flex-1 md:flex-col md:overflow-y-auto">
           <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Workspace</span>
         {topIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
@@ -93,7 +95,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 px-3 pb-4 md:flex md:flex-col">
+      <div className="grid grid-cols-2 gap-2 px-3 pb-4 md:flex md:flex-col md:border-t md:border-slate-200 md:pt-4 dark:md:border-slate-800">
         <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Preferences</span>
         {bottomIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
@@ -132,8 +134,8 @@ function SidebarButton({
       className={({ isActive }) =>
         `inline-flex w-full min-w-0 items-center rounded-2xl px-4 py-3 text-sm font-medium transition ${
           isActive
-            ? "bg-sky-500/20 text-white ring-1 ring-inset ring-sky-400/40"
-            : "text-slate-300 hover:bg-white/5 hover:text-white"
+            ? "bg-sky-100 text-sky-900 ring-1 ring-inset ring-sky-300 dark:bg-sky-500/20 dark:text-white dark:ring-sky-400/40"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
         }`
       }
     >
