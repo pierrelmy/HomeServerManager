@@ -329,7 +329,7 @@ import sys
 
 path = Path(sys.argv[1])
 content = path.read_text(encoding="utf-8").splitlines()
-target = 'TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}'
+target = 'TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/bin/bash","/srv/homeservermanager-dev/deploy/update-hsm-dev.sh"]}'
 replaced = False
 result = []
 for line in content:
@@ -365,7 +365,7 @@ SYSTEM_ADAPTER=local
 SYSTEM_SERVICE_MAP={"demo-service":"homelab-demo.service","docker-engine":"docker.service"}
 NAS_SCRUB_COMMAND=["/usr/bin/true"]
 NAS_STATUS_COMMAND=["/usr/local/libexec/homeservermanager/nas-status"]
-TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/usr/local/bin/update-hsm-dev.sh"]}
+TOOL_COMMANDS={"scan-reseau":["/usr/local/libexec/homeservermanager/scan-network"],"update-hsm":["sudo","-n","/bin/bash","/srv/homeservermanager-dev/deploy/update-hsm-dev.sh"]}
 EOF
   chown "$VM_USER:$VM_USER" "$backend_env"
 }
