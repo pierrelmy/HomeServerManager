@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { useEffect } from "react"
 import SideBar from "./components/SideBar"
 import NotFound from "./pages/NotFound"
 import Login from "./pages/Login"
@@ -14,19 +15,44 @@ import ServiceWebView from "./pages/ServiceWebView"
 import { HomelabRepositoryProvider } from "./data/HomelabRepositoryProvider"
 import { HomelabLiveProvider } from "./live/HomelabLiveProvider"
 import { useAuthSession } from "./hooks/useAuthSession"
-import { Alert, Button, Spinner } from "react-bootstrap"
-import { useHomelabLiveState } from "./live/useHomelabLive"
+import { Alert, Button, Spinner } from "./components/ui"
+import { useHomelabLiveState, useHomelabSettings } from "./live/useHomelabLive"
+
+function ThemeSync() {
+  const settings = useHomelabSettings()
+
+  useEffect(() => {
+    const root = document.documentElement
+    const density = settings?.density ?? 100
+    root.style.fontSize = `${Math.max(87.5, Math.min(112.5, density))}%`
+
+    if (!settings) return
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    const apply = () => {
+      const isDark = settings.theme === "dark" || (settings.theme === "system" && media.matches)
+      root.classList.toggle("dark", isDark)
+      root.dataset.theme = settings.theme
+    }
+
+    apply()
+    media.addEventListener("change", apply)
+    return () => media.removeEventListener("change", apply)
+  }, [settings])
+
+  return null
+}
 
 function AppShell() {
   const liveState = useHomelabLiveState()
 
   return (
-    <div className="app-shell d-flex flex-column flex-md-row">
+    <div className="min-h-screen md:flex">
       <SideBar />
 
-      <main className="app-main flex-grow-1 min-vw-0">
-        <div className="app-main__inner">
-          {liveState.error ? <Alert variant="warning" className="app-banner">{liveState.error}</Alert> : null}
+      <main className="min-w-0 flex-1">
+        <div className="min-h-screen p-4 lg:p-6">
+          {liveState.error ? <Alert tone="warning" className="mb-4">{liveState.error}</Alert> : null}
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/services" element={<Services />} />
@@ -50,6 +76,7 @@ export default function App()
   return (
     <HomelabRepositoryProvider>
       <HomelabLiveProvider>
+        <ThemeSync />
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
@@ -63,20 +90,24 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center" role="status">
-        <Spinner animation="border" />
-        <span className="visually-hidden">Chargement...</span>
+      <div className="flex min-h-screen items-center justify-center" role="status">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+          <Spinner />
+          <span>Chargement...</span>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-vh-100 d-flex align-items-center justify-content-center p-3">
-        <Alert variant="danger" className="mb-0" style={{ maxWidth: 560 }}>
-          <Alert.Heading>Impossible de charger le homelab</Alert.Heading>
-          <p>{error}</p>
-          <Button variant="outline-danger" onClick={() => void retry()}>Réessayer</Button>
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Alert tone="danger" className="max-w-xl">
+          <div className="text-base font-semibold">Impossible de charger le homelab</div>
+          <p className="mt-2">{error}</p>
+          <div className="mt-4">
+            <Button variant="danger" onClick={() => void retry()}>Réessayer</Button>
+          </div>
         </Alert>
       </div>
     )

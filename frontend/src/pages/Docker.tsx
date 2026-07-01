@@ -7,10 +7,9 @@ import {
   type IconProps,
 } from "@tabler/icons-react"
 import { useMemo, useState } from "react"
-import { Alert, Button, Form } from "react-bootstrap"
 import type { DockerContainer, DockerImage, DockerVolume } from "../domain/homelab"
 import { useHomelabDocker, useHomelabLiveManager, useHomelabLiveState } from "../live/useHomelabLive"
-import { EmptyState, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge } from "../components/ui"
+import { Alert, Button, EmptyState, Input, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge } from "../components/ui"
 
 interface DockerAction {
   id: "start" | "stop" | "restart" | "pull" | "run"
@@ -54,13 +53,12 @@ function ActionButtons({
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="d-flex flex-row flex-wrap gap-2 mt-3">
+    <div className="mt-3 flex flex-wrap gap-2">
       {actions.map((action) => (
         <Button
           key={action.id}
-          size="sm"
-          variant={action.variant}
-          className="d-flex align-items-center gap-1"
+          variant={action.variant === "danger" ? "danger" : action.variant === "primary" || action.variant === "success" ? "primary" : "secondary"}
+          className="flex items-center gap-1 px-3 py-2 text-xs"
           disabled={busyAction === `${resourceId}:${action.id}`}
           onClick={() => onAction(action.id, resourceId)}
         >
@@ -86,11 +84,11 @@ function ContainerCard({
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="data-card d-flex flex-column">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="mb-1">{container.name}</h5>
-          <span className="text-secondary small">{shortId(container.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{container.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(container.id)}</span>
         </div>
 
         <StatusBadge tone={container.cpuPercent > 70 ? "danger" : container.cpuPercent > 40 ? "warning" : "success"}>
@@ -98,9 +96,9 @@ function ContainerCard({
         </StatusBadge>
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Image:</strong> {image ? `${image.name}:${image.tag}` : "Image inconnue"}
         </span>
@@ -123,19 +121,19 @@ function ImageCard({ image, busyAction, onAction }: {
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="data-card d-flex flex-column">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="mb-1">{image.name}</h5>
-          <span className="text-secondary small">{shortId(image.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{image.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(image.id)}</span>
         </div>
 
         <StatusBadge>{image.tag}</StatusBadge>
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Taille:</strong> {image.sizeMB} MB
         </span>
@@ -151,19 +149,19 @@ function ImageCard({ image, busyAction, onAction }: {
 
 function VolumeCard({ volume }: { volume: DockerVolume }) {
   return (
-    <div className="data-card d-flex flex-column">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h5 className="mb-1">{volume.name}</h5>
-          <span className="text-secondary small">{shortId(volume.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{volume.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(volume.id)}</span>
         </div>
 
-        <IconBox size={24} className="text-secondary" />
+        <IconBox size={24} className="text-slate-500 dark:text-slate-400" />
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Taille:</strong> {volume.sizeMB} MB
         </span>
@@ -268,33 +266,32 @@ export default function DockerPage() {
         description="Supervision et actions courantes sur les conteneurs, images et volumes."
         actions={(
           <>
-            <Form.Control
-              className="search-input"
+            <Input
               type="search"
               placeholder="Rechercher un conteneur, une image, un volume..."
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
-              style={{ maxWidth: 420 }}
+              className="max-w-[420px]"
             />
-            <Button variant="outline-secondary" onClick={() => void liveManager.refreshAll()}>
+            <Button variant="secondary" onClick={() => void liveManager.refreshAll()}>
               <IconRefresh />
             </Button>
           </>
         )}
       />
 
-      {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
+      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
-      <div className="row g-3">
-        <div className="col-12 col-md-4"><StatTile label="Conteneurs" value={snapshot.containers.length} meta="Instances suivies" tone="primary" /></div>
-        <div className="col-12 col-md-4"><StatTile label="Images" value={snapshot.images.length} meta="Références disponibles" /></div>
-        <div className="col-12 col-md-4"><StatTile label="Volumes" value={snapshot.volumes.length} meta="Stockage Docker" /></div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><StatTile label="Conteneurs" value={snapshot.containers.length} meta="Instances suivies" tone="primary" /></div>
+        <div><StatTile label="Images" value={snapshot.images.length} meta="Références disponibles" /></div>
+        <div><StatTile label="Volumes" value={snapshot.volumes.length} meta="Stockage Docker" /></div>
       </div>
 
-      <div className="row g-3">
-        <div className="col-12 col-xl-4">
+      <div className="grid gap-3 xl:grid-cols-3">
+        <div>
           <SectionTitle title="Containers" />
-          <div className="d-flex flex-column gap-3">
+          <div className="flex flex-col gap-3">
             {displayedContainers.length <= 0 ? (
               <EmptyState title="Aucun conteneur ne correspond à cette recherche" />
             ) : (
@@ -312,9 +309,9 @@ export default function DockerPage() {
           </div>
         </div>
 
-        <div className="col-12 col-xl-4">
+        <div>
           <SectionTitle title="Images" />
-          <div className="d-flex flex-column gap-3">
+          <div className="flex flex-col gap-3">
             {displayedImages.length <= 0 ? (
               <EmptyState title="Aucune image ne correspond à cette recherche" />
             ) : (
@@ -330,9 +327,9 @@ export default function DockerPage() {
           </div>
         </div>
 
-        <div className="col-12 col-xl-4">
+        <div>
           <SectionTitle title="Volumes" />
-          <div className="d-flex flex-column gap-3">
+          <div className="flex flex-col gap-3">
             {displayedVolumes.length <= 0 ? (
               <EmptyState title="Aucun volume ne correspond à cette recherche" />
             ) : (

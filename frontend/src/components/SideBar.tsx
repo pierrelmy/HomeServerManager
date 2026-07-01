@@ -11,6 +11,7 @@ import {
   type IconProps,
 } from "@tabler/icons-react"
 import { NavLink } from "react-router-dom"
+import { useHomelabSettings } from "../live/useHomelabLive"
 
 interface SideBarElement {
     id: string,
@@ -34,21 +35,23 @@ const bottomIcons: SideBarElement[] = [
 ]
 
 export default function Sidebar() {
+  const settings = useHomelabSettings()
+
   return (
-    <aside className="app-sidebar d-flex flex-column justify-content-between flex-shrink-0">
+    <aside className={`flex shrink-0 flex-col justify-between border-b border-slate-200 bg-slate-950 text-slate-300 md:min-h-screen md:border-b-0 md:border-r md:border-slate-800 ${settings?.compactSidebar ? "md:w-24" : "md:w-72"}`}>
       <div>
-        <div className="app-sidebar__brand d-flex align-items-center gap-3">
-          <div className="app-sidebar__brand-mark">
+        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-500/20">
             <IconBolt size={20} stroke={2.2} />
           </div>
-          <div>
-            <p className="app-sidebar__brand-title">HomeServerManager</p>
-            <p className="app-sidebar__brand-subtitle">Admin console</p>
+          <div className={settings?.compactSidebar ? "hidden md:block" : ""}>
+            <p className="text-sm font-semibold text-white">HomeServerManager</p>
+            <p className="text-xs text-slate-400">Admin console</p>
           </div>
         </div>
 
-        <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2">
-          <span className="app-sidebar__group-label">Workspace</span>
+        <div className="flex flex-row gap-2 overflow-x-auto px-3 py-4 md:flex-col">
+          <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Workspace</span>
         {topIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
             key={id}
@@ -56,26 +59,26 @@ export default function Sidebar() {
             path={path}
             end={path === "/"}
           >
-            <div className="d-flex flex-row align-items-center justify-content-start gap-2">
+            <div className="flex flex-row items-center justify-start gap-3">
               <Icon size={22} stroke={1.75} />
-              <span className="fs-5">{label}</span>
+              <span className={`${settings?.compactSidebar ? "hidden md:inline" : ""}`}>{label}</span>
             </div>
           </SidebarButton>
         ))}
         </div>
       </div>
 
-      <div className="app-sidebar__group d-flex flex-row flex-md-column gap-2">
-        <span className="app-sidebar__group-label">Preferences</span>
+      <div className="flex flex-row gap-2 overflow-x-auto px-3 pb-4 md:flex-col">
+        <span className={`px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 ${settings?.compactSidebar ? "hidden md:block" : ""}`}>Preferences</span>
         {bottomIcons.map(({ id, icon: Icon, label, path }) => (
           <SidebarButton
             key={id}
             label={label}
             path={path}
           >
-            <div className="d-flex flex-row align-items-center justify-content-start gap-2">
+            <div className="flex flex-row items-center justify-start gap-3">
               <Icon size={22} stroke={1.75} />
-              <span className="fs-5">{label}</span>
+              <span className={`${settings?.compactSidebar ? "hidden md:inline" : ""}`}>{label}</span>
             </div>
           </SidebarButton>
         ))}
@@ -102,7 +105,11 @@ function SidebarButton({
       aria-label={label}
       title={label}
       className={({ isActive }) =>
-        `btn ${isActive ? "btn-primary" : "btn-light"} app-sidebar__button d-flex flex-row align-items-center justify-content-start p-0`
+        `inline-flex min-w-max items-center rounded-2xl px-4 py-3 text-sm font-medium transition md:min-w-0 ${
+          isActive
+            ? "bg-sky-500/20 text-white ring-1 ring-inset ring-sky-400/40"
+            : "text-slate-300 hover:bg-white/5 hover:text-white"
+        }`
       }
     >
       {children}

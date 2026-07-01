@@ -1,8 +1,7 @@
 import { useState } from "react"
-import { Button, Form } from "react-bootstrap"
 import { IconTerminal2, IconPlayerPlay, IconRefresh } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabTerminal } from "../live/useHomelabLive"
-import { PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
+import { Button, Input, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
 
 export default function TerminalPage() {
   const liveManager = useHomelabLiveManager()
@@ -29,12 +28,12 @@ export default function TerminalPage() {
         title="Terminal"
         description="Console connectée au backend pour exécuter les commandes autorisées et lire leur sortie."
         actions={(
-          <div className="d-flex gap-2">
+          <div className="flex gap-2">
             <StatusBadge tone="neutral">
-              <IconTerminal2 size={14} className="me-2" />
+              <IconTerminal2 size={14} />
               {activeSession.status === "connected" ? "Session active" : activeSession.status}
             </StatusBadge>
-            <Button variant="outline-secondary" className="d-flex align-items-center gap-2" onClick={() => void liveManager.refreshAll()}>
+            <Button variant="secondary" className="flex items-center gap-2" onClick={() => void liveManager.refreshAll()}>
               <IconRefresh size={18} />
               Synchroniser
             </Button>
@@ -42,18 +41,18 @@ export default function TerminalPage() {
         )}
       />
 
-      <div className="row g-3">
-        <div className="col-12 col-xl-8">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <div>
           <Surface className="h-100">
             <SectionTitle title="Console" subtitle="Sortie temps réel de la session active." />
             <div className="terminal-surface">
               {activeSession.lines.map((line, index) => (
                 <div key={`${line.command}-${index}`} className="mb-3">
-                  <div className="text-success">
+                  <div className="text-emerald-400">
                     {activeSession.prompt} {line.command}
                   </div>
                   {line.output.map((row) => (
-                    <div key={`${line.command}-${row}`} className={line.status === "warning" ? "text-warning" : "text-light"}>
+                    <div key={`${line.command}-${row}`} className={line.status === "warning" ? "text-amber-300" : "text-slate-200"}>
                       {row}
                     </div>
                   ))}
@@ -61,33 +60,32 @@ export default function TerminalPage() {
               ))}
             </div>
 
-            <Form
-              className="d-flex flex-column flex-md-row gap-2 mt-3"
+            <form
+              className="mt-3 flex flex-col gap-2 md:flex-row"
               onSubmit={(event) => {
                 event.preventDefault()
                 handleRun()
               }}
             >
-              <Form.Control
-                className="surface-input"
+              <Input
                 value={command}
                 onChange={(event) => setCommand(event.target.value)}
                 placeholder="Tape une commande, par exemple `docker ps` ou `df -h`"
               />
-              <Button type="submit" className="d-flex align-items-center gap-2">
+              <Button type="submit" className="flex items-center gap-2">
                 <IconPlayerPlay size={18} />
                 Exécuter
               </Button>
-            </Form>
+            </form>
           </Surface>
         </div>
 
-        <div className="col-12 col-xl-4">
+        <div>
           <Surface className="h-100">
             <SectionTitle title="Raccourcis" subtitle="Préremplit une commande dans le champ." />
-            <div className="d-grid gap-2">
+            <div className="grid gap-2">
               {activeSession.quickCommands.map((quick) => (
-                <Button key={quick} variant="outline-secondary" onClick={() => setCommand(quick)}>
+                <Button key={quick} variant="secondary" onClick={() => setCommand(quick)}>
                   {quick}
                 </Button>
               ))}

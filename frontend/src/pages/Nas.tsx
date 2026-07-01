@@ -1,8 +1,7 @@
 import { useState } from "react"
-import { Alert, Button, ProgressBar, Table } from "react-bootstrap"
 import { IconRefresh, IconShieldCheck } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabNas } from "../live/useHomelabLive"
-import { EmptyState, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge, Surface } from "../components/ui"
+import { Alert, Button, EmptyState, PageHeader, PageShell, ProgressBar, SectionTitle, StatTile, StatusBadge, Surface } from "../components/ui"
 
 export default function NasPage() {
   const liveManager = useHomelabLiveManager()
@@ -36,12 +35,12 @@ export default function NasPage() {
         title="NAS"
         description="Vue d’ensemble des pools, des disques et des sauvegardes récentes."
         actions={(
-          <div className="d-flex gap-2">
-            <Button variant="outline-secondary" className="d-flex align-items-center gap-2" onClick={() => void liveManager.refreshAll()}>
+          <div className="flex gap-2">
+            <Button variant="secondary" className="flex items-center gap-2" onClick={() => void liveManager.refreshAll()}>
               <IconRefresh size={18} />
               Synchroniser
             </Button>
-            <Button variant="primary" className="d-flex align-items-center gap-2" disabled={scrubRunning} onClick={() => void runScrub()}>
+            <Button variant="primary" className="flex items-center gap-2" disabled={scrubRunning} onClick={() => void runScrub()}>
               <IconShieldCheck size={18} />
               Lancer un scrub
             </Button>
@@ -50,61 +49,59 @@ export default function NasPage() {
       />
 
       {actionMessage ? (
-        <Alert variant={actionMessage.type} dismissible onClose={() => setActionMessage(null)}>{actionMessage.text}</Alert>
+        <Alert tone={actionMessage.type}>{actionMessage.text}</Alert>
       ) : null}
 
-      <div className="row g-3">
-        <div className="col-12 col-md-6 col-xl-3"><StatTile label="Capacité utilisée" value={nas.capacityUsed} meta="Sur l’ensemble du stockage visible" tone="primary" /></div>
-        <div className="col-12 col-md-6 col-xl-3"><StatTile label="Santé" value={nas.healthSummary} meta="État synthétique des pools" /></div>
-        <div className="col-12 col-md-6 col-xl-3"><StatTile label="Sauvegarde" value={nas.backupSummary} meta="Derniers cycles connus" /></div>
-        <div className="col-12 col-md-6 col-xl-3"><StatTile label="Température" value={nas.temperatureSummary} meta="Signal thermique global" tone="warning" /></div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div><StatTile label="Capacité utilisée" value={nas.capacityUsed} meta="Sur l’ensemble du stockage visible" tone="primary" /></div>
+        <div><StatTile label="Santé" value={nas.healthSummary} meta="État synthétique des pools" /></div>
+        <div><StatTile label="Sauvegarde" value={nas.backupSummary} meta="Derniers cycles connus" /></div>
+        <div><StatTile label="Température" value={nas.temperatureSummary} meta="Signal thermique global" tone="warning" /></div>
       </div>
 
-      <div className="row g-3">
-        <div className="col-12 col-xl-7">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div>
           <Surface className="h-100">
             <SectionTitle title="Pools" subtitle="Capacité, état et température." trailing={<StatusBadge>{nas.pools.length} pools</StatusBadge>} />
 
-            <div className="d-flex flex-column gap-3">
+            <div className="flex flex-col gap-3">
               {nas.pools.length === 0 ? (
                 <EmptyState title="Aucun pool remonté par le backend." />
               ) : nas.pools.map((pool) => (
                 <div key={pool.name} className="data-card">
-                  <div className="d-flex flex-column flex-md-row justify-content-between gap-2">
+                  <div className="flex flex-col justify-between gap-2 md:flex-row">
                     <div>
-                      <div className="fw-semibold">{pool.name}</div>
-                      <div className="text-secondary small">{pool.type}</div>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{pool.name}</div>
+                      <div className="text-sm text-slate-500 dark:text-slate-400">{pool.type}</div>
                     </div>
-                    <div className="d-flex align-items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <StatusBadge tone={pool.health === "Healthy" ? "success" : "warning"}>{pool.health}</StatusBadge>
-                      <span className="text-secondary small">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
                         {pool.used} / {pool.total} To
                       </span>
                     </div>
                   </div>
-                  <ProgressBar
-                    now={(pool.used / pool.total) * 100}
-                    className="mt-3"
-                    variant={pool.health === "Healthy" ? "info" : "warning"}
-                  />
-                  <div className="text-secondary small mt-2">Température disque: {pool.temp} °C</div>
+                  <div className="mt-3">
+                    <ProgressBar value={(pool.used / pool.total) * 100} tone={pool.health === "Healthy" ? "primary" : "warning"} />
+                  </div>
+                  <div className="mt-2 text-sm text-slate-500 dark:text-slate-400">Température disque: {pool.temp} °C</div>
                 </div>
               ))}
             </div>
           </Surface>
         </div>
 
-        <div className="col-12 col-xl-5">
+        <div>
           <Surface className="h-100">
             <SectionTitle title="Sauvegardes récentes" subtitle="Historique des derniers jobs connus." />
-            <div className="d-flex flex-column gap-2">
+            <div className="flex flex-col gap-2">
               {nas.backups.length === 0 ? (
                 <EmptyState title="Aucune sauvegarde remontée par le backend." />
               ) : nas.backups.map((item) => (
-                <div key={item.label} className="data-card d-flex justify-content-between align-items-center">
+                <div key={item.label} className="data-card flex items-center justify-between gap-3">
                   <div>
-                    <div className="fw-semibold">{item.label}</div>
-                    <div className="text-secondary small">{item.when}</div>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100">{item.label}</div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">{item.when}</div>
                   </div>
                   <StatusBadge tone={item.result === "Succès" ? "success" : "warning"}>{item.result}</StatusBadge>
                 </div>
@@ -117,32 +114,34 @@ export default function NasPage() {
       <Surface>
         <SectionTitle title="Disques" subtitle="Contrôle SMART synthétique." />
 
-        <Table responsive className="mb-0 align-middle">
-          <thead>
-            <tr>
-              <th>Emplacement</th>
-              <th>Modèle</th>
-              <th>Température</th>
-              <th>Statut</th>
+        <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="text-slate-500 dark:text-slate-400">
+            <tr className="border-b border-slate-200 dark:border-slate-800">
+              <th className="py-3 pr-4 font-medium">Emplacement</th>
+              <th className="py-3 pr-4 font-medium">Modèle</th>
+              <th className="py-3 pr-4 font-medium">Température</th>
+              <th className="py-3 font-medium">Statut</th>
             </tr>
           </thead>
           <tbody>
             {nas.drives.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-secondary">Aucun disque remonté par le backend.</td>
+                <td colSpan={4} className="py-4 text-slate-500 dark:text-slate-400">Aucun disque remonté par le backend.</td>
               </tr>
             ) : nas.drives.map((drive) => (
-              <tr key={drive.slot}>
-                <td>{drive.slot}</td>
-                <td>{drive.model}</td>
-                <td>{drive.temp} °C</td>
-                <td>
+              <tr key={drive.slot} className="border-b border-slate-100 dark:border-slate-800/70">
+                <td className="py-3 pr-4">{drive.slot}</td>
+                <td className="py-3 pr-4">{drive.model}</td>
+                <td className="py-3 pr-4">{drive.temp} °C</td>
+                <td className="py-3">
                   <StatusBadge tone={drive.status === "Healthy" ? "success" : "warning"}>{drive.status}</StatusBadge>
                 </td>
               </tr>
             ))}
           </tbody>
-        </Table>
+        </table>
+        </div>
       </Surface>
     </PageShell>
   )

@@ -1,9 +1,8 @@
-import { Alert, Button, Spinner } from "react-bootstrap"
 import { IconArrowLeft, IconExternalLink } from "@tabler/icons-react"
 import { Link, useParams } from "react-router-dom"
 import { useEffect, useMemo, useState } from "react"
 import { useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
-import { PageHeader, PageShell, Surface } from "../components/ui"
+import { Alert, Button, PageHeader, PageShell, Spinner, Surface } from "../components/ui"
 
 function resolveIframeUrl(rawUrl: string): string {
   try {
@@ -49,8 +48,8 @@ export default function ServiceWebView() {
   if (!service) {
     return (
       <div className="p-3 p-lg-4">
-        <Alert variant="warning" className="mb-3">Service introuvable.</Alert>
-        <Link to="/services" className="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+        <Alert tone="warning" className="mb-3">Service introuvable.</Alert>
+        <Link to="/services" className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
           <IconArrowLeft size={18} />
           <span>Retour aux services</span>
         </Link>
@@ -61,10 +60,10 @@ export default function ServiceWebView() {
   if (!iframeUrl) {
     return (
       <div className="p-3 p-lg-4">
-        <Alert variant="warning" className="mb-3">
+        <Alert tone="warning" className="mb-3">
           Ce service n’a pas d’URL web configurée.
         </Alert>
-        <Link to="/services" className="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+        <Link to="/services" className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
           <IconArrowLeft size={18} />
           <span>Retour aux services</span>
         </Link>
@@ -79,21 +78,23 @@ export default function ServiceWebView() {
         title={service.label}
         description="Tentative d’ouverture intégrée de l’interface web du service. Si le service refuse l’embed, ouvre-le dans un nouvel onglet."
         actions={(
-          <div className="d-flex flex-wrap gap-2">
-            <Link to="/services" className="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link to="/services" className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
               <IconArrowLeft size={18} />
               <span>Retour</span>
             </Link>
-            <Button as="a" href={iframeUrl} target="_blank" rel="noreferrer" variant="primary" className="d-inline-flex align-items-center gap-2">
+            <a href={iframeUrl} target="_blank" rel="noreferrer">
+              <Button variant="primary" className="inline-flex items-center gap-2">
               <IconExternalLink size={18} />
               <span>Ouvrir dans un nouvel onglet</span>
-            </Button>
+              </Button>
+            </a>
           </div>
         )}
       />
 
       {iframeTimedOut && !iframeLoaded ? (
-        <Alert variant="warning" className="mb-0">
+        <Alert tone="warning">
           <div className="fw-semibold mb-1">Intégration iframe probablement refusée</div>
           <div>
             Ce service n’a pas chargé dans le délai attendu. C’est typiquement le cas quand il renvoie
@@ -104,20 +105,19 @@ export default function ServiceWebView() {
           </div>
         </Alert>
       ) : (
-        <Alert variant="light" className="mb-0">
+        <Alert tone="neutral">
           Si la page refuse l’affichage dans une iframe via `X-Frame-Options` ou `frame-ancestors`, utilise l’ouverture dans un nouvel onglet.
         </Alert>
       )}
 
       <Surface>
-      <div className="border rounded overflow-hidden bg-body position-relative" style={{ minHeight: "70vh" }}>
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950" style={{ minHeight: "70vh" }}>
         {!iframeLoaded && !iframeTimedOut ? (
           <div
-            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-2 bg-body"
-            style={{ zIndex: 1 }}
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white dark:bg-slate-950"
           >
-            <Spinner animation="border" />
-            <span className="text-secondary">Chargement de l’interface…</span>
+            <Spinner className="h-5 w-5" />
+            <span className="text-slate-500 dark:text-slate-400">Chargement de l’interface…</span>
           </div>
         ) : null}
         <iframe

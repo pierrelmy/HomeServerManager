@@ -21,11 +21,10 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react"
 import { useEffect, useMemo, useState } from "react"
-import { Alert, Button, Form, Modal, Nav, Offcanvas, Spinner } from "react-bootstrap"
 import { useNavigate } from "react-router-dom"
 import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
-import { EmptyState, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge } from "../components/ui"
+import { Alert, Button, EmptyState, Input, PageHeader, PageShell, SectionTitle, Spinner, StatTile, StatusBadge, Surface, Textarea } from "../components/ui"
 
 interface ServiceAction {
   id: "start" | "stop" | "restart" | "see-logs"
@@ -234,17 +233,17 @@ function ServiceCard({
         }
       }}
     >
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-2">
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          <span className="fs-3">{service.label}</span>
+      <div className="flex flex-col items-start justify-between gap-2 lg:flex-row lg:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-2xl font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
           {service.webUrl ? (
             <StatusBadge tone="primary">
               <IconExternalLink size={14} />
-              <span className="ms-1">Interface web</span>
+              <span>Interface web</span>
             </StatusBadge>
           ) : null}
         </div>
-        <div className="d-flex flex-row justify-content-center align-items-center gap-2">
+        <div className="flex items-center gap-2">
           <StatusBadge
             tone={
               service.status === "starting" || service.status === "stopping"
@@ -261,19 +260,19 @@ function ServiceCard({
         </div>
       </div>
 
-      <div className="d-flex flex-column flex-lg-row justify-content-between gap-2">
-        <span className="text-secondary">{service.desc}</span>
-        <div className="d-flex flex-column text-secondary text-lg-end">
+      <div className="flex flex-col justify-between gap-2 lg:flex-row">
+        <span className="text-slate-600 dark:text-slate-300">{service.desc}</span>
+        <div className="flex flex-col text-sm text-slate-500 dark:text-slate-400 lg:text-right">
           <span>{service.unit}</span>
           {service.servicePath ? <span className="small">{service.servicePath}</span> : <span className="small">{service.location}</span>}
         </div>
       </div>
 
-      <div className="d-flex flex-wrap justify-content-start gap-2 mt-2">
+      <div className="mt-2 flex flex-wrap justify-start gap-2">
         {service.webUrl ? (
           <Button
-            className="d-flex flex-row justify-content-center align-items-center gap-1"
-            variant="outline-primary"
+            className="flex items-center gap-1"
+            variant="secondary"
             onClick={(event) => {
               stopClickPropagation(event)
               onOpenWeb(service.id)
@@ -286,8 +285,8 @@ function ServiceCard({
         {getServiceActions(service.status).map((action) => (
           <Button
             key={action.id}
-            className="d-flex flex-row justify-content-center align-items-center gap-1"
-            variant={action.variant}
+            className="flex items-center gap-1"
+            variant={action.variant === "danger" ? "danger" : action.variant === "primary" ? "primary" : "secondary"}
             disabled={busyAction === `${service.id}:${action.id}`}
             onClick={(event) => {
               stopClickPropagation(event)
@@ -320,13 +319,13 @@ function KnownServiceCard({
       className="catalog-card"
       onClick={() => onSelect(service)}
     >
-      <div className="d-flex align-items-center gap-2 mb-2">
-        <service.icon size={24} className="text-secondary" />
-        <span className="fs-5 fw-semibold">{service.label}</span>
+      <div className="mb-2 flex items-center gap-2">
+        <service.icon size={24} className="text-slate-500 dark:text-slate-400" />
+        <span className="text-lg font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
       </div>
-      <div className="small text-secondary mb-3">{service.description}</div>
-      <div className="small text-muted mb-1">{service.serviceUnit}</div>
-      <div className="small text-muted">
+      <div className="mb-3 text-sm text-slate-600 dark:text-slate-300">{service.description}</div>
+      <div className="mb-1 text-sm text-slate-500 dark:text-slate-400">{service.serviceUnit}</div>
+      <div className="text-sm text-slate-500 dark:text-slate-400">
         {service.installCommand ? "Préremplit l’installation et le mode déjà installé." : "Préremplit le mode service déjà installé."}
       </div>
     </button>
@@ -342,23 +341,26 @@ function LogLine({
   verbosity: LogVerbosity
   content: string
 }) {
-  let contentClass = "fs-5"
+  let contentClass = "text-sm"
 
   switch (verbosity) {
     case "debug":
-      contentClass += " text-secondary fw-light"
+      contentClass += " text-slate-500 dark:text-slate-400"
       break
     case "warning":
-      contentClass += " text-warning fw-semibold"
+      contentClass += " font-semibold text-amber-500"
       break
     case "error":
-      contentClass += " text-danger fw-bold"
+      contentClass += " font-semibold text-rose-500"
+      break
+    default:
+      contentClass += " text-slate-800 dark:text-slate-100"
       break
   }
 
   return (
-    <div className="d-flex flex-row gap-2">
-      <span className="text-secondary fs-5">{timestamp}</span>
+    <div className="flex gap-2">
+      <span className="font-mono text-sm text-slate-500 dark:text-slate-400">{timestamp}</span>
       <span className={contentClass}>{content}</span>
     </div>
   )
@@ -525,10 +527,10 @@ export default function Services() {
           title="Services"
           description="Pilotage des unités systemd, ajout de services connus ou personnalisés, accès aux logs et aux interfaces web."
           actions={(
-            <>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="primary"
-                className="d-flex align-items-center gap-2"
+                className="flex items-center gap-2"
                 onClick={() => {
                   setCreateError(null)
                   setCreateMode("catalog")
@@ -540,55 +542,51 @@ export default function Services() {
                 <IconPlus />
                 <span>Ajouter un service</span>
               </Button>
-              <Button variant="outline-secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
-                {refreshingServices ? <Spinner animation="border" size="sm" /> : <IconRefresh />}
+              <Button variant="secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
+                {refreshingServices ? <Spinner /> : <IconRefresh />}
               </Button>
-            </>
+            </div>
           )}
         />
 
-        <div className="row g-3">
-          <div className="col-12 col-md-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
             <StatTile label="Services suivis" value={services.length} meta="Inventaire courant de l’instance" tone="primary" />
           </div>
-          <div className="col-12 col-md-4">
+          <div>
             <StatTile label="En exécution" value={services.filter((service) => service.status === "running").length} meta="Unités systemd actives" tone="success" />
           </div>
-          <div className="col-12 col-md-4">
+          <div>
             <StatTile label="En anomalie" value={services.filter((service) => service.status === "failed").length} meta="Intervention potentiellement requise" tone={services.some((service) => service.status === "failed") ? "danger" : "neutral"} />
           </div>
         </div>
 
-        <div className="surface-card">
-          <div className="card-body d-flex flex-column gap-3">
+        <Surface className="flex flex-col gap-3">
             <SectionTitle title="Liste des services" subtitle="Recherche, filtrage, actions d’administration et ouverture d’interface web." />
             <div className="surface-toolbar">
-              <div className="form flex-grow-1 flex-lg-grow-0" style={{ maxWidth: 420 }}>
-            <input
-              className="form-control search-input"
+              <div className="flex-1 lg:max-w-[420px]">
+            <Input
               type="search"
               placeholder="Rechercher un service"
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
             />
               </div>
-              <div className="d-flex flex-wrap justify-content-start align-items-center gap-3">
-                <div className="form-check d-flex align-items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                   <input
-                    className="form-check-input"
+                    className="h-4 w-4 rounded border-slate-300 accent-sky-600"
                     type="radio"
                     id="filterAll"
                     checked={statusFilters.length === 0}
                     onChange={() => setStatusFilters([])}
                   />
-                  <label className="form-check-label fs-6 m-0" htmlFor="filterAll">
-                    Tous
-                  </label>
-                </div>
+                  <span>Tous</span>
+                </label>
                 {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
-                  <div key={status} className="form-check d-flex align-items-center gap-2">
+                  <label key={status} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <input
-                      className="form-check-input"
+                      className="h-4 w-4 rounded border-slate-300 accent-sky-600"
                       type="checkbox"
                       id={status}
                       onChange={() =>
@@ -598,17 +596,15 @@ export default function Services() {
                       }
                       checked={statusFilters.includes(status)}
                     />
-                    <label className="form-check-label fs-6 m-0" htmlFor={status}>
-                      {capitalize(status)}
-                    </label>
-                  </div>
+                    <span>{capitalize(status)}</span>
+                  </label>
                 ))}
               </div>
             </div>
 
-            {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
+            {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
-            <div className="d-flex flex-column gap-3">
+            <div className="flex flex-col gap-3">
               {displayedServices.length <= 0 ? (
                 <EmptyState title="Aucun service ne correspond à cette recherche" />
               ) : (
@@ -624,26 +620,22 @@ export default function Services() {
                 ))
               )}
             </div>
-          </div>
-        </div>
+        </Surface>
       </PageShell>
 
-      <Offcanvas
-        show={displayedLogsServiceId.trim() !== ""}
-        onHide={() => setDisplayedLogsServiceId("")}
-        placement="end"
-        style={{ "--bs-offcanvas-width": "min(560px, 100vw)" } as React.CSSProperties}
-      >
-        <Offcanvas.Header closeButton>
-          <Offcanvas.Title>
+      {displayedLogsServiceId.trim() !== "" ? (
+      <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/50">
+        <div className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="text-lg font-semibold text-slate-950 dark:text-slate-50">
             {services.find((service) => service.id === displayedLogsServiceId)?.label ?? "Unknown service"}
-          </Offcanvas.Title>
-        </Offcanvas.Header>
-        <Offcanvas.Body>
+            </div>
+            <Button variant="secondary" onClick={() => setDisplayedLogsServiceId("")}>Fermer</Button>
+          </div>
           <div>
             {refreshingLogsFor === displayedLogsServiceId ? (
-              <Alert variant="light" className="d-flex align-items-center gap-2">
-                <Spinner animation="border" size="sm" />
+              <Alert tone="neutral" className="mb-3 flex items-center gap-2">
+                <Spinner />
                 <span>Chargement des logs système...</span>
               </Alert>
             ) : null}
@@ -652,23 +644,26 @@ export default function Services() {
                 <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
               ))
             ) : (
-              <Alert variant="warning" className="d-flex flex-row gap-2 align-items-center">
+              <Alert tone="warning" className="flex items-center gap-2">
                 <IconAlertHexagon />
-                <span className="fs-4">Aucun log disponible</span>
+                <span>Aucun log disponible</span>
               </Alert>
             )}
           </div>
-        </Offcanvas.Body>
-      </Offcanvas>
+        </div>
+      </div>
+      ) : null}
 
-      <Modal show={showCreateModal} onHide={() => !creatingServiceId && setShowCreateModal(false)} size="lg" centered>
-        <Modal.Header closeButton={!creatingServiceId}>
-          <Modal.Title>Ajouter un service</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {createError ? <Alert variant="danger">{createError}</Alert> : null}
-          <Alert variant="warning">
-            <div className="fw-semibold mb-1">Avertissement sécurité</div>
+      {showCreateModal ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+        <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="text-xl font-semibold text-slate-950 dark:text-slate-50">Ajouter un service</div>
+            <Button variant="secondary" onClick={() => !creatingServiceId && setShowCreateModal(false)} disabled={creatingServiceId !== null}>Fermer</Button>
+          </div>
+          {createError ? <Alert tone="danger" className="mb-3">{createError}</Alert> : null}
+          <Alert tone="warning" className="mb-4">
+            <div className="mb-1 font-semibold">Avertissement sécurité</div>
             <div>
               La commande bash d'installation sera exécutée sur la machine avec des privilèges élevés.
               Toute injection, substitution non maîtrisée, expansion shell ou commande destructive peut compromettre entièrement la VM.
@@ -676,161 +671,155 @@ export default function Services() {
             </div>
           </Alert>
 
-          <Nav
-            variant="tabs"
-            activeKey={createMode}
-            onSelect={(eventKey) => {
-              if (eventKey === "catalog" || eventKey === "installed" || eventKey === "install") setCreateMode(eventKey)
-            }}
-            className="mb-3"
-          >
-            <Nav.Item>
-              <Nav.Link eventKey="catalog">Recherche un service</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="installed">Service déjà installé</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="install">Service à installer</Nav.Link>
-            </Nav.Item>
-          </Nav>
+          <div className="mb-4 inline-flex rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900">
+            {[
+              ["catalog", "Recherche un service"],
+              ["installed", "Service déjà installé"],
+              ["install", "Service à installer"],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setCreateMode(mode as typeof createMode)}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  createMode === mode
+                    ? "bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-slate-50"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-          <Form
+          <form
             onSubmit={(event) => {
               event.preventDefault()
               if (canCreateService) void handleCreateService()
             }}
           >
             {createMode === "catalog" ? (
-              <div className="row g-3 mb-3">
+              <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {knownServices.map((service) => (
-                  <div key={service.id} className="col-12 col-md-6 col-xl-4">
+                  <div key={service.id}>
                     <KnownServiceCard service={service} onSelect={applyKnownService} />
                   </div>
                 ))}
               </div>
             ) : null}
 
-            <Form.Group className="mb-3">
-              <Form.Label>Nom affiché</Form.Label>
-              <Form.Control
-                className="surface-input"
+            <label className="mb-3 block">
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nom affiché</span>
+              <Input
                 value={createDraft.label}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
                 placeholder="Ollama"
                 required
               />
-            </Form.Group>
+            </label>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                className="surface-input"
+            <label className="mb-3 block">
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Description</span>
+              <Input
                 value={createDraft.description ?? ""}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
                 placeholder="Service LLM local"
               />
-            </Form.Group>
+            </label>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Unité systemd</Form.Label>
-              <Form.Control
-                className="surface-input"
+            <label className="mb-3 block">
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Unité systemd</span>
+              <Input
                 value={createDraft.serviceUnit}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
                 placeholder="ollama.service"
                 required
               />
-            </Form.Group>
+            </label>
 
-            <Form.Group className="mb-3">
-              <Form.Label>URL web exposée</Form.Label>
-              <Form.Control
-                className="surface-input"
+            <label className="mb-3 block">
+              <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">URL web exposée</span>
+              <Input
                 value={createDraft.webUrl ?? ""}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
                 placeholder="http://127.0.0.1:8080"
                 type="url"
               />
-              <Form.Text className="text-muted">
+              <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
                 Si le service expose une interface web, elle sera ouvrable depuis la liste des services dans une iframe.
-              </Form.Text>
-            </Form.Group>
+              </span>
+            </label>
 
             {createMode === "catalog" ? (
-              <Alert variant="light" className="mb-3">
+              <Alert tone="neutral" className="mb-3">
                 Sélectionne un service connu ci-dessus pour préremplir le formulaire, puis complète ou ajuste les champs avant validation.
               </Alert>
             ) : null}
 
             {createMode === "installed" ? (
-              <Form.Group className="mb-3">
-                <Form.Label>Chemin du service déjà installé</Form.Label>
-                <Form.Control
-                  className="surface-input"
+              <label className="mb-3 block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Chemin du service déjà installé</span>
+                <Input
                   value={createDraft.servicePath ?? ""}
                   onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
                   placeholder="/etc/systemd/system/ollama.service"
                   required
                 />
-                <Form.Text className="text-muted">
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
                   Renseigne le chemin absolu du fichier `.service` déjà présent sur la machine.
-                </Form.Text>
-              </Form.Group>
+                </span>
+              </label>
             ) : createMode === "install" ? (
-              <Form.Group className="mb-3">
-                <Form.Label>Commande bash d'installation</Form.Label>
-                <Form.Control
-                  className="surface-input"
-                  as="textarea"
+              <label className="mb-3 block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Commande bash d'installation</span>
+                <Textarea
                   rows={6}
                   value={createDraft.installCommand ?? ""}
                   onChange={(event) => setCreateDraft((current) => ({ ...current, installCommand: event.target.value }))}
                   placeholder={"curl -fsSL https://ollama.com/install.sh | sh\nsystemctl enable ollama\nsystemctl start ollama"}
                   required
                 />
-                <Form.Text className="text-muted">
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
                   Cette commande sera exécutée via `sudo -n /bin/bash -lc ...`. Vérifie chaque ligne avant exécution.
-                </Form.Text>
-              </Form.Group>
+                </span>
+              </label>
             ) : null}
 
-            <Form.Group className="mb-3">
-              <Form.Check
+            <label className="mb-3 flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
+              <input
                 type="checkbox"
-                label="Démarrer le service après installation"
+                className="h-4 w-4 rounded border-slate-300 accent-sky-600"
                 checked={createDraft.startAfterInstall}
                 onChange={(event) => setCreateDraft((current) => ({ ...current, startAfterInstall: event.target.checked }))}
               />
-            </Form.Group>
+              <span>Démarrer le service après installation</span>
+            </label>
 
-            <div className="border rounded p-3 bg-light">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="fw-semibold">Progression</span>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">Progression</span>
                 {creatingServiceId ? (
-                  <span className="d-flex align-items-center gap-2 text-secondary">
-                    <Spinner animation="border" size="sm" />
+                  <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                    <Spinner />
                     <span>Exécution en cours</span>
                   </span>
                 ) : null}
               </div>
-              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              <div className="max-h-[220px] overflow-y-auto">
                 {createProgressLogs.length > 0 ? (
                   createProgressLogs.map((log, index) => (
                     <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
                   ))
                 ) : (
-                  <Alert variant="light" className="mb-0">
+                  <Alert tone="neutral">
                     Les logs d’installation et d’ajout apparaîtront ici.
                   </Alert>
                 )}
               </div>
             </div>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
+            <div className="mt-4 flex justify-end gap-2">
           <Button
-            variant="outline-secondary"
+            variant="secondary"
             onClick={() => {
               setShowCreateModal(false)
               setCreateProgressLogs([])
@@ -842,8 +831,11 @@ export default function Services() {
           <Button variant="primary" onClick={() => void handleCreateService()} disabled={!canCreateService || creatingServiceId !== null}>
             {creatingServiceId ? "Ajout..." : "Ajouter"}
           </Button>
-        </Modal.Footer>
-      </Modal>
+            </div>
+          </form>
+        </div>
+      </div>
+      ) : null}
     </>
   )
 }

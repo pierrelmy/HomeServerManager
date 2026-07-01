@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { Alert, Button, Card } from "react-bootstrap"
 import {
   IconDatabase,
   IconDownload,
@@ -10,7 +9,7 @@ import {
   type IconProps,
 } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabTools } from "../live/useHomelabLive"
-import { EmptyState, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
+import { Alert, Button, EmptyState, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
 
 export default function ToolsPage() {
   const liveManager = useHomelabLiveManager()
@@ -55,7 +54,7 @@ export default function ToolsPage() {
         title="Tools"
         description="Raccourcis d’administration et actions de maintenance courantes."
         actions={
-          <Button variant="outline-secondary" className="d-flex align-items-center gap-2" onClick={() => void liveManager.refreshAll()}>
+          <Button variant="secondary" className="flex items-center gap-2" onClick={() => void liveManager.refreshAll()}>
             <IconRefresh size={18} />
             Synchroniser
           </Button>
@@ -63,43 +62,41 @@ export default function ToolsPage() {
       />
 
       {actionMessage ? (
-        <Alert variant={actionMessage.type} dismissible onClose={() => setActionMessage(null)}>{actionMessage.text}</Alert>
+        <Alert tone={actionMessage.type}>{actionMessage.text}</Alert>
       ) : null}
 
-      <div className="row g-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {tools.tools.length === 0 ? (
-          <div className="col-12">
+          <div className="md:col-span-2 xl:col-span-3">
             <EmptyState title="Aucun outil configuré sur cette instance." />
           </div>
         ) : tools.tools.map((tool) => {
           const Icon = iconByTag[tool.tag] ?? IconTools
 
           return (
-            <div className="col-12 col-md-6 col-xl-4" key={tool.title}>
-              <Card className="surface-card h-100">
-                <Card.Body className="d-flex flex-column gap-3">
-                  <div className="d-flex justify-content-between align-items-start gap-3">
-                    <div className="rounded bg-body-tertiary p-3">
+            <div key={tool.title}>
+              <Surface className="flex h-full flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                       <Icon size={24} />
                     </div>
                     <StatusBadge>{tool.tag}</StatusBadge>
                   </div>
 
                   <div>
-                    <h2 className="h5 mb-2">{tool.title}</h2>
-                    <p className="text-secondary mb-0">{tool.description}</p>
+                    <h2 className="mb-2 text-lg font-semibold text-slate-950 dark:text-slate-50">{tool.title}</h2>
+                    <p className="text-slate-600 dark:text-slate-300">{tool.description}</p>
                   </div>
 
                   <Button
-                    variant="outline-secondary"
+                    variant="secondary"
                     className="mt-auto"
                     disabled={runningTool === slug(tool.title)}
                     onClick={() => void runTool(tool.title)}
                   >
                     Lancer
                   </Button>
-                </Card.Body>
-              </Card>
+              </Surface>
             </div>
           )
         })}
@@ -107,13 +104,13 @@ export default function ToolsPage() {
 
       <Surface>
         <SectionTitle title="Derniers travaux" subtitle="Historique récent des actions exécutées." />
-        <div className="d-flex flex-column gap-2">
+        <div className="flex flex-col gap-2">
           {tools.recentJobs.length === 0 ? (
             <EmptyState title="Aucun travail récent." />
           ) : tools.recentJobs.map((job) => (
-            <div key={job.label} className="data-card d-flex justify-content-between align-items-center">
+            <div key={job.label} className="data-card flex items-center justify-between gap-3">
               <span>{job.label}</span>
-              <span className="text-secondary small">{job.when}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">{job.when}</span>
             </div>
           ))}
         </div>

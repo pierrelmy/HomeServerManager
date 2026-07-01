@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom"
-import { Button } from "react-bootstrap"
-import { PageShell, Surface } from "../components/ui"
+import { Button, PageShell, Surface } from "../components/ui"
 
 export default function NotFound()
 {
@@ -8,11 +7,11 @@ export default function NotFound()
 
     return (
         <PageShell>
-            <Surface className="mx-auto" >
-                <div className="d-flex flex-column justify-content-center align-items-center text-center gap-3 py-4">
-                    <div className="page-eyebrow">404</div>
-                    <h1 className="mb-0">Page introuvable</h1>
-                    <p className="text-secondary mb-0">La route demandée n’existe pas ou n’est plus disponible.</p>
+            <Surface className="mx-auto max-w-xl">
+                <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600 dark:text-sky-400">404</div>
+                    <h1 className="text-3xl font-semibold text-slate-950 dark:text-slate-50">Page introuvable</h1>
+                    <p className="text-slate-600 dark:text-slate-300">La route demandée n’existe pas ou n’est plus disponible.</p>
                     <Button onClick={() => navigate('/')}>
                         Retourner à l'accueil
                     </Button>
