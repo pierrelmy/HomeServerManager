@@ -712,7 +712,7 @@ export default function Services() {
                 ))}
               </div>
             ) : null}
-
+{/* 
             <div className="mb-4 grid gap-4 md:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nom affiché</span>
@@ -761,7 +761,7 @@ export default function Services() {
               <Alert tone="neutral" className="mb-3">
                 Sélectionne un service connu ci-dessus pour préremplir le formulaire, puis complète ou ajuste les champs avant validation.
               </Alert>
-            ) : null}
+            ) : null} */}
 
             {createMode === "installed" ? (
               <label className="mb-3 block">
