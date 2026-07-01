@@ -4,7 +4,8 @@ set -euo pipefail
 ROOT=/srv/homeservermanager-dev
 BRANCH=dev
 STATUS_FILE=/var/lib/homeservermanager/update-hsm-status.json
-TOTAL_STEPS=8
+LOG_FILE=/var/lib/homeservermanager/update-hsm.log
+TOTAL_STEPS=10
 CURRENT_STEP=0
 CURRENT_LABEL="Initialisation"
 
@@ -44,6 +45,11 @@ gray_stream() {
   done
 }
 
+append_log_line() {
+  local line="$1"
+  printf '%s %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$line" >>"$LOG_FILE"
+}
+
 json_escape() {
   python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"
 }
@@ -65,11 +71,46 @@ step_progress() {
   CURRENT_STEP="$1"
   CURRENT_LABEL="$2"
   write_status "running" "$CURRENT_LABEL"
+  append_log_line "STEP [$CURRENT_STEP/$TOTAL_STEPS] $CURRENT_LABEL"
   step "[$CURRENT_STEP/$TOTAL_STEPS] $CURRENT_LABEL"
 }
 
 run_gray() {
-  "$@" 2>&1 | gray_stream
+  local pipe
+  local command_pid
+  local stream_pid
+  local heartbeat_pid
+  local exit_code
+
+  pipe=$(mktemp -u)
+  mkfifo "$pipe"
+
+  (
+    while IFS= read -r line; do
+      append_log_line "$line"
+      printf '%s\n' "$line"
+    done <"$pipe"
+  ) | gray_stream &
+  stream_pid=$!
+
+  "$@" >"$pipe" 2>&1 &
+  command_pid=$!
+
+  (
+    while kill -0 "$command_pid" 2>/dev/null; do
+      write_status "running" "$CURRENT_LABEL"
+      sleep 5
+    done
+  ) &
+  heartbeat_pid=$!
+
+  wait "$command_pid"
+  exit_code=$?
+  kill "$heartbeat_pid" 2>/dev/null || true
+  wait "$heartbeat_pid" 2>/dev/null || true
+  wait "$stream_pid" 2>/dev/null || true
+  rm -f "$pipe"
+  return "$exit_code"
 }
 
 check_url() {
@@ -98,6 +139,8 @@ show_service_status() {
 }
 
 STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+install -d -m 0755 /var/lib/homeservermanager
+: >"$LOG_FILE"
 write_status "running" "Initialisation"
 trap 'write_status "failed" "${CURRENT_LABEL}" "update-hsm-dev.sh failed at line ${LINENO}."; printf "%s\n" "${C_RED}ERROR:${C_RESET} update-hsm-dev.sh failed at line ${LINENO}.${C_RESET}" >&2' ERR
 
@@ -113,36 +156,47 @@ run_gray sudo -u ubuntu bash -lc "
 step_progress 2 "Refreshing update script"
 install -m 0755 -o root -g root "$ROOT/deploy/update-hsm-dev.sh" /usr/local/bin/update-hsm-dev.sh
 
-step_progress 3 "Backend install/build"
+step_progress 3 "Backend dependencies install"
 run_gray sudo -u ubuntu bash -lc "
   cd '$ROOT/backend' &&
-  npm ci --no-audit --no-fund &&
+  npm ci --no-audit --no-fund
+"
+
+step_progress 4 "Backend build"
+run_gray sudo -u ubuntu bash -lc "
+  cd '$ROOT/backend' &&
   npm run build
 "
 
-step_progress 4 "Frontend install/build"
+step_progress 5 "Frontend dependencies install"
 run_gray sudo -u ubuntu bash -lc "
   mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
   cd '$ROOT/frontend' &&
-  npm ci --no-audit --no-fund &&
+  npm ci --no-audit --no-fund
+"
+
+step_progress 6 "Frontend build"
+run_gray sudo -u ubuntu bash -lc "
+  mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
+  cd '$ROOT/frontend' &&
   npm run build
 "
 
-step_progress 5 "Syncing root-owned helper scripts"
+step_progress 7 "Syncing root-owned helper scripts"
 install -m 0755 -o root -g root "$ROOT/deploy/scripts/scan-network.mjs" /usr/local/libexec/homeservermanager/scan-network
 
-step_progress 6 "Syncing sudoers and systemd units"
+step_progress 8 "Syncing sudoers and systemd units"
 install -m 0440 -o root -g root "$ROOT/deploy/homelab-sudoers" /etc/sudoers.d/homeservermanager
 visudo -cf /etc/sudoers.d/homeservermanager >/dev/null
 install -m 0644 -o root -g root "$ROOT/deploy/homelab-backend-dev.service" /etc/systemd/system/homeservermanager-backend-dev.service
 install -m 0644 -o root -g root "$ROOT/deploy/homelab-frontend-dev.service" /etc/systemd/system/homeservermanager-frontend-dev.service
 systemctl daemon-reload
 
-step_progress 7 "Restarting services"
+step_progress 9 "Restarting services"
 sudo systemctl restart homeservermanager-backend-dev
 sudo systemctl restart homeservermanager-frontend-dev
 
-step_progress 8 "Health checks"
+step_progress 10 "Health checks"
 check_url http://127.0.0.1:3000/health "Backend health" || { show_service_status; exit 1; }
 check_url http://127.0.0.1:3000/ready "Backend readiness" || { show_service_status; exit 1; }
 check_url http://127.0.0.1:4173 "Frontend preview" || { show_service_status; exit 1; }
