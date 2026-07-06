@@ -1,7 +1,24 @@
 # Changelog
 
-## Unreleased (dev branch)
+## Unreleased (dev branch — PR #14 pending merge to main)
 
+### Features
+- Terminal session clear persisté via API (`POST /terminal/sessions/:id/clear`) — admin-only, audité, broadcast WebSocket
+- Backup SQLite automatisé : script `deploy/backup-sqlite.sh` + systemd timer quotidien (02h00, 7 derniers backups conservés)
+
+### Tests
+- 28 tests E2E Playwright ajoutés : auth, navigation (7 pages), terminal, services
+
+### Documentation
+- `docs/SECRET_ROTATION.md` : runbook de rotation pour SESSION_SECRET, ADMIN_PASSWORD, METRICS_TOKEN
+- `CLAUDE.md` + `.claude/agents/` (7 agents) + `.claude/knowledge/` (standards, architecture, 6 ADRs)
+
+### CI / Infrastructure
+- GitHub Actions workflows : SHA-pinned (supply chain security, depuis main)
+- Merge dev ↔ main : divergence de 64 commits résolue
+- Corrections CI : react-hooks/purity, react-hooks/set-state-in-effect, TS2345, unused-vars
+
+### Fixes précédents (sur dev)
 - Terminal page: fix permissions errors, scroll behaviour, grid layout
 - Update script (`update-hsm`): fix Ubuntu permissions error
 
