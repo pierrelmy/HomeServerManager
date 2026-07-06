@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { IconAlertTriangle, IconPlayerPlay, IconRefresh, IconTerminal2 } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabTerminal } from "../live/useHomelabLive"
 import { Alert, Button, Input, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
@@ -11,10 +11,6 @@ export default function TerminalPage() {
   const activeSession = terminal?.sessions.find((session) => session.id === terminal.activeSessionId) ?? terminal?.sessions[0]
   const lineCount = activeSession?.lines.length ?? 0
   const lastLine = activeSession?.lines.at(-1) ?? null
-  const dangerExamples = useMemo(
-    () => ["docker ps -a", "systemctl status docker --no-pager", "journalctl -u homeservermanager-backend-dev.service -n 50 --no-pager"],
-    [],
-  )
 
   const handleRun = () => {
     const trimmed = command.trim()
@@ -130,30 +126,6 @@ export default function TerminalPage() {
             </form>
           </Surface>
         </div>
-
-        {/* <div>
-          <Surface>
-            <SectionTitle title="Raccourcis" subtitle="Préremplit une commande dans le champ." />
-            <div className="grid gap-2">
-              {activeSession.quickCommands.map((quick) => (
-                <Button key={quick} variant="secondary" onClick={() => setCommand(quick)}>
-                  {quick}
-                </Button>
-              ))}
-            </div>
-          </Surface>
-
-          <Surface className="mt-3">
-            <SectionTitle title="Exemples utiles" subtitle="Quelques commandes pratiques pour diagnostiquer rapidement la machine." />
-            <div className="grid gap-2">
-              {dangerExamples.map((example) => (
-                <Button key={example} variant="ghost" className="justify-start rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-left text-xs dark:border-slate-800 dark:bg-slate-950" onClick={() => setCommand(example)}>
-                  {example}
-                </Button>
-              ))}
-            </div>
-          </Surface>
-        </div> */}
       </div>
     </PageShell>
   )
