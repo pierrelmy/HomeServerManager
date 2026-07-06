@@ -8,6 +8,7 @@ export default function TerminalPage() {
   const liveState = useHomelabLiveState()
   const terminal = useHomelabTerminal()
   const [command, setCommand] = useState("")
+  const [clearBusy, setClearBusy] = useState(false)
   const activeSession = terminal?.sessions.find((session) => session.id === terminal.activeSessionId) ?? terminal?.sessions[0]
   const lineCount = activeSession?.lines.length ?? 0
   const lastLine = activeSession?.lines.at(-1) ?? null
@@ -17,6 +18,16 @@ export default function TerminalPage() {
     if (!trimmed) return
     liveManager.executeTerminalCommand(trimmed)
     setCommand("")
+  }
+
+  const handleClear = async () => {
+    if (!activeSession) return
+    setClearBusy(true)
+    try {
+      await liveManager.clearTerminalSession(activeSession.id)
+    } finally {
+      setClearBusy(false)
+    }
   }
 
   if (!liveState.ready || !terminal || !activeSession) {
@@ -38,10 +49,11 @@ export default function TerminalPage() {
             <Button
               variant="secondary"
               className="flex items-center gap-2"
-              onClick={() => liveManager.clearTerminalSession(activeSession.id)}
+              onClick={() => void handleClear()}
+              disabled={clearBusy}
             >
               <IconTrash size={18} />
-              Réinitialiser
+              {clearBusy ? "Réinitialisation..." : "Réinitialiser"}
             </Button>
           </div>
         )}

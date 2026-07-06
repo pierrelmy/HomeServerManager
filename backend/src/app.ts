@@ -318,6 +318,12 @@ export async function buildApp(config: AppConfig, dependencies: AppDependencies 
     return reply.status(201).send(result)
   })
 
+  app.post("/terminal/sessions/:id/clear", { preHandler: requireAdmin, config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
+    const session = getSession(request)!
+    const { id } = idParamsSchema.parse(request.params)
+    return audited(repository, session, "terminal.clear", id, () => service.clearTerminalSession(id))
+  })
+
   app.post("/tools/:id/run", { preHandler: requireAdmin, config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request) => {
     const session = getSession(request)!
     const { id } = idParamsSchema.parse(request.params)

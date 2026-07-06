@@ -35,4 +35,5 @@ export interface HomelabRepository {
   actOnImage(id: string, action: "pull" | "run"): Promise<DockerSnapshot>
   runNasScrub(): Promise<ToolJob>
   runTool(id: string): Promise<ToolJob>
+  clearTerminalSession(id: string): Promise<TerminalSnapshot>
 }

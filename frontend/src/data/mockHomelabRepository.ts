@@ -172,5 +172,11 @@ export function createMockHomelabRepository(): HomelabRepository {
     runTool: async () => {
       throw new Error("Aucun outil n'est configuré dans ce mode.")
     },
+    clearTerminalSession: async (id) => {
+      const sessionState = terminal.sessions.find((item) => item.id === id)
+      if (!sessionState) throw new Error("Session terminal introuvable dans le mode mock.")
+      sessionState.lines = []
+      return delay(terminal)
+    },
   }
 }

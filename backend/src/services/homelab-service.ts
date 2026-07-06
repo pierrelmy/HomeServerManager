@@ -9,6 +9,7 @@ import type {
   ServiceRecord,
   SettingsState,
   TerminalLine,
+  TerminalSnapshot,
   ToolsSnapshot,
   UpdateStatus,
 } from "../shared/contracts.js"
@@ -443,5 +444,15 @@ export class HomelabService {
     this.repository.appendTerminalLine(sessionId, line)
     this.events.broadcast({ type: "terminal.line.appended", sessionId, line, limit: 100 })
     return { sessionId, line }
+  }
+
+  async clearTerminalSession(requestedSessionId?: string): Promise<TerminalSnapshot> {
+    const terminal = this.repository.getTerminal()
+    const sessionId = requestedSessionId ?? terminal.activeSessionId
+    if (!terminal.sessions.some((session) => session.id === sessionId)) throw notFound(`Unknown terminal session: ${sessionId}`)
+    this.repository.clearTerminalSession(sessionId)
+    const nextTerminal = this.repository.getTerminal()
+    this.events.broadcast({ type: "terminal.updated", terminal: nextTerminal })
+    return nextTerminal
   }
 }

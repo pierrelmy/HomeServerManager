@@ -34,6 +34,7 @@ export interface HomelabRepository {
   saveTools(value: ToolsSnapshot): void
   getTerminal(): TerminalSnapshot
   appendTerminalLine(sessionId: string, line: TerminalLine): void
+  clearTerminalSession(sessionId: string): void
   getAccount(): AccountProfile
   getSettings(ownerId: string): SettingsState
   saveSettings(ownerId: string, value: SettingsState): void
@@ -94,6 +95,13 @@ export class SqliteHomelabRepository implements HomelabRepository {
     const session = terminal.sessions.find((item) => item.id === sessionId)
     if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
     session.lines = [...session.lines, clone(line)].slice(-100)
+    this.setSnapshot("terminal", terminal)
+  }
+  clearTerminalSession(sessionId: string) {
+    const terminal = this.getTerminal()
+    const session = terminal.sessions.find((item) => item.id === sessionId)
+    if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
+    session.lines = []
     this.setSnapshot("terminal", terminal)
   }
   getAccount() { return this.getSnapshot<AccountProfile>("account") }
@@ -212,6 +220,11 @@ export class InMemoryHomelabRepository implements HomelabRepository {
     const session = this.terminal.sessions.find((item) => item.id === sessionId)
     if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
     session.lines = [...session.lines, clone(line)].slice(-100)
+  }
+  clearTerminalSession(sessionId: string) {
+    const session = this.terminal.sessions.find((item) => item.id === sessionId)
+    if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
+    session.lines = []
   }
   getAccount() { return clone(accountSeed) }
   getSettings(ownerId: string) { return clone(this.settings.get(ownerId) ?? settingsSeed) }

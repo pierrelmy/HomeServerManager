@@ -83,5 +83,7 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
       fetchJson<DockerSnapshot>(baseUrl, `/docker/images/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     runNasScrub: () => fetchJson<ToolJob>(baseUrl, "/nas/scrub", { method: "POST" }),
     runTool: (id) => fetchJson<ToolJob>(baseUrl, `/tools/${encodeURIComponent(id)}/run`, { method: "POST" }),
+    clearTerminalSession: (id) =>
+      fetchJson<TerminalSnapshot>(baseUrl, `/terminal/sessions/${encodeURIComponent(id)}/clear`, { method: "POST" }),
   }
 }

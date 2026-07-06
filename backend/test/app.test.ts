@@ -275,6 +275,51 @@ describe("homelab API", () => {
     expect(limited.statusCode).toBe(429)
   })
 
+  it("clears a terminal session persistently", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+
+    const executed = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/execute",
+      headers: { cookie },
+      payload: { command: "printf 'hello'" },
+    })
+    expect(executed.statusCode).toBe(201)
+
+    const cleared = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/sessions/terminal/clear",
+      headers: { cookie },
+    })
+    expect(cleared.statusCode, cleared.body).toBe(200)
+    expect(cleared.json()).toMatchObject({
+      activeSessionId: "terminal",
+      sessions: [
+        expect.objectContaining({
+          id: "terminal",
+          lines: [],
+        }),
+      ],
+    })
+
+    const terminal = await instance.app.inject({
+      method: "GET",
+      url: "/terminal",
+      headers: { cookie },
+    })
+    expect(terminal.statusCode).toBe(200)
+    expect(terminal.json()).toMatchObject({
+      activeSessionId: "terminal",
+      sessions: [
+        expect.objectContaining({
+          id: "terminal",
+          lines: [],
+        }),
+      ],
+    })
+  })
+
   it("returns a client error when a local service command fails", async () => {
     built = await buildApp({
       ...config,
