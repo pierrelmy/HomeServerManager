@@ -60,6 +60,7 @@ export interface HomelabLiveManager {
   runTool(id: string): Promise<void>
   refreshTools(): Promise<void>
   executeTerminalCommand(command: string): void
+  clearTerminalSession(sessionId?: string): void
   requestRefresh(scope: keyof HomelabLiveBundle | "all"): void
 }
 
@@ -501,6 +502,21 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
         type: "terminal.line.appended",
         sessionId: nextSessionId,
         line: nextLine,
+      })
+    },
+    clearTerminalSession(sessionId) {
+      terminal.update((current) => {
+        if (!current) return current
+
+        const targetSessionId = sessionId ?? current.activeSessionId
+        return {
+          ...current,
+          sessions: current.sessions.map((session) =>
+            session.id === targetSessionId
+              ? { ...session, lines: [] }
+              : session,
+          ),
+        }
       })
     },
     requestRefresh(scope: keyof HomelabLiveBundle | "all") {

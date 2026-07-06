@@ -295,6 +295,14 @@ export class LocalSystemAdapter implements SystemAdapter {
         timeout: this.timeoutMs,
         maxBuffer: 1_024 * 1_024,
         windowsHide: true,
+        env: {
+          ...process.env,
+          HOME: "/var/lib/homeservermanager",
+          XDG_CONFIG_HOME: "/var/lib/homeservermanager/xdg-config",
+          DOCKER_CONFIG: process.env.DOCKER_CONFIG ?? "/var/lib/homeservermanager/docker",
+          BASH_ENV: "",
+          ENV: "",
+        },
       })
       const stdoutLines = stdout.trim().split("\n").map((line) => line.trimEnd()).filter(Boolean)
       const stderrLines = stderr.trim().split("\n").map((line) => line.trimEnd()).filter(Boolean)

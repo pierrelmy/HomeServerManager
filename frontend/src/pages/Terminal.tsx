@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { IconAlertTriangle, IconPlayerPlay, IconRefresh, IconTerminal2 } from "@tabler/icons-react"
+import { IconAlertTriangle, IconPlayerPlay, IconTerminal2, IconTrash } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabTerminal } from "../live/useHomelabLive"
 import { Alert, Button, Input, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
 
@@ -35,12 +35,13 @@ export default function TerminalPage() {
               <IconTerminal2 size={14} />
               {activeSession.status === "connected" ? "Session active" : activeSession.status}
             </StatusBadge>
-            <StatusBadge tone="warning">
-              Mode sensible
-            </StatusBadge>
-            <Button variant="secondary" className="flex items-center gap-2" onClick={() => void liveManager.refreshAll()}>
-              <IconRefresh size={18} />
-              Synchroniser
+            <Button
+              variant="secondary"
+              className="flex items-center gap-2"
+              onClick={() => liveManager.clearTerminalSession(activeSession.id)}
+            >
+              <IconTrash size={18} />
+              Réinitialiser
             </Button>
           </div>
         )}
