@@ -291,7 +291,7 @@ export class LocalSystemAdapter implements SystemAdapter {
 
   private async executeShellCommand(command: string): Promise<CommandResult> {
     try {
-      const { stdout, stderr } = await execFileAsync("/bin/bash", ["-lc", command], {
+      const { stdout, stderr } = await execFileAsync("/bin/bash", ["-c", command], {
         timeout: this.timeoutMs,
         maxBuffer: 1_024 * 1_024,
         windowsHide: true,

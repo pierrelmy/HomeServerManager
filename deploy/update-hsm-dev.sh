@@ -5,6 +5,9 @@ ROOT=/srv/homeservermanager-dev
 BRANCH=dev
 STATUS_FILE=/var/lib/homeservermanager/update-hsm-status.json
 LOG_FILE=/var/lib/homeservermanager/update-hsm.log
+STATE_DIR=/var/lib/homeservermanager
+NPM_CACHE_DIR=/var/lib/homeservermanager/npm-cache
+XDG_CONFIG_DIR=/var/lib/homeservermanager/xdg-config
 TOTAL_STEPS=10
 CURRENT_STEP=0
 CURRENT_LABEL="Initialisation"
@@ -115,6 +118,21 @@ run_gray() {
   return "$exit_code"
 }
 
+ensure_runtime_dirs() {
+  install -d -m 0755 /var/lib/homeservermanager
+  install -d -m 0755 -o ubuntu -g ubuntu "$NPM_CACHE_DIR"
+  install -d -m 0755 -o ubuntu -g ubuntu "$XDG_CONFIG_DIR"
+}
+
+run_as_ubuntu() {
+  local cmd="$1"
+  run_gray sudo -H -u ubuntu env \
+    HOME=/home/ubuntu \
+    XDG_CONFIG_HOME="$XDG_CONFIG_DIR" \
+    NPM_CONFIG_CACHE="$NPM_CACHE_DIR" \
+    bash -c "$cmd"
+}
+
 check_url() {
   local url="$1"
   local label="$2"
@@ -143,12 +161,13 @@ show_service_status() {
 STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 install -d -m 0755 /var/lib/homeservermanager
 : >"$LOG_FILE"
+ensure_runtime_dirs
 write_status "running" "Initialisation"
 trap 'write_status "failed" "${CURRENT_LABEL}" "update-hsm-dev.sh failed at line ${LINENO}."; printf "%s\n" "${C_RED}ERROR:${C_RESET} update-hsm-dev.sh failed at line ${LINENO}.${C_RESET}" >&2' ERR
 
 step_progress 1 "Updating $ROOT on branch $BRANCH"
 
-run_gray sudo -u ubuntu bash -lc "
+run_as_ubuntu "
   cd '$ROOT' &&
   git fetch origin &&
   git switch '$BRANCH' &&
@@ -159,26 +178,26 @@ step_progress 2 "Refreshing update script"
 install -m 0755 -o root -g root "$ROOT/deploy/update-hsm-dev.sh" /usr/local/bin/update-hsm-dev.sh
 
 step_progress 3 "Backend dependencies install"
-run_gray sudo -u ubuntu bash -lc "
+run_as_ubuntu "
   cd '$ROOT/backend' &&
   npm ci --no-audit --no-fund
 "
 
 step_progress 4 "Backend build"
-run_gray sudo -u ubuntu bash -lc "
+run_as_ubuntu "
   cd '$ROOT/backend' &&
   npm run build
 "
 
 step_progress 5 "Frontend dependencies install"
-run_gray sudo -u ubuntu bash -lc "
+run_as_ubuntu "
   mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
   cd '$ROOT/frontend' &&
   npm ci --no-audit --no-fund
 "
 
 step_progress 6 "Frontend build"
-run_gray sudo -u ubuntu bash -lc "
+run_as_ubuntu "
   mkdir -p '$ROOT/frontend/node_modules/.vite-temp' &&
   cd '$ROOT/frontend' &&
   npm run build
@@ -204,7 +223,7 @@ check_url http://127.0.0.1:3000/ready "Backend readiness" || { show_service_stat
 check_url http://127.0.0.1:4173 "Frontend preview" || { show_service_status; exit 1; }
 
 step "Deployed revision"
-REVISION=$(sudo -u ubuntu bash -lc "cd '$ROOT' && git rev-parse --short HEAD")
+REVISION=$(sudo -H -u ubuntu env HOME=/home/ubuntu XDG_CONFIG_HOME="$XDG_CONFIG_DIR" bash -c "cd '$ROOT' && git rev-parse --short HEAD")
 info "$REVISION"
 write_status "completed" "Completed" "" "$REVISION"
 STATUS_WRITES_ENABLED=0
