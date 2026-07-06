@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import SideBar from "./components/SideBar"
 import NotFound from "./pages/NotFound"
 import Login from "./pages/Login"
@@ -76,6 +76,8 @@ function UpdateProgressToast() {
   const liveManager = useHomelabLiveManager()
   const tools = useHomelabTools()
   const update = tools?.updateStatus
+  const [hiddenForFinishedAt, setHiddenForFinishedAt] = useState<string | null>(null)
+  const hidden = hiddenForFinishedAt !== null && hiddenForFinishedAt === update?.finishedAt
 
   useEffect(() => {
     if (!update || update.status === "idle") {
@@ -89,14 +91,17 @@ function UpdateProgressToast() {
     return () => window.clearInterval(interval)
   }, [liveManager, update?.status])
 
-  if (!update || update.status === "idle") {
-    return null
-  }
+  useEffect(() => {
+    if (!update?.finishedAt) return
+    const finishedAt = update.finishedAt
+    const delay = update.status === "completed" ? 5_000 : 60_000
+    const remaining = Math.max(0, new Date(finishedAt).getTime() + delay - Date.now())
+    const timer = window.setTimeout(() => setHiddenForFinishedAt(finishedAt), remaining)
+    return () => window.clearTimeout(timer)
+  }, [update?.finishedAt, update?.status])
 
-  if (update.finishedAt) {
-    const elapsedMs = Date.now() - new Date(update.finishedAt).getTime()
-    if (update.status === "completed" && elapsedMs > 5_000) return null
-    if (update.status === "failed" && elapsedMs > 60_000) return null
+  if (!update || update.status === "idle" || hidden) {
+    return null
   }
 
   const total = Math.max(1, update.totalSteps || 1)

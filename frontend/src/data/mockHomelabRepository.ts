@@ -157,13 +157,13 @@ export function createMockHomelabRepository(): HomelabRepository {
       if (!service) throw new Error("Service introuvable dans le mode mock.")
       return delay(service)
     },
-    actOnService: async (_id, _action) => {
+    actOnService: async () => {
       throw new Error("Aucun service n'est configuré dans ce mode.")
     },
-    actOnContainer: async (_id, _action) => {
+    actOnContainer: async () => {
       throw new Error("Aucun conteneur n'est configuré dans ce mode.")
     },
-    actOnImage: async (_id, _action) => {
+    actOnImage: async () => {
       throw new Error("Aucune image n'est configurée dans ce mode.")
     },
     runNasScrub: async () => {

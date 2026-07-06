@@ -178,6 +178,7 @@ describe("homelab API", () => {
       location: "homelab-demo.service",
       unit: "homelab-demo.service",
       servicePath: null,
+      webUrl: null,
       status: "stopped",
       logs: [],
     })
@@ -336,6 +337,7 @@ describe("homelab API", () => {
       location: "homelab-demo.service",
       unit: "homelab-demo.service",
       servicePath: null,
+      webUrl: null,
       status: "stopped",
       logs: [],
     })

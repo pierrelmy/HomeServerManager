@@ -487,7 +487,7 @@ export default function Services() {
     if (!creatingServiceId) return
     const currentLogs = services?.find((service) => service.id === creatingServiceId)?.logs
     if (currentLogs && currentLogs.length > 0) {
-      setCreateProgressLogs(currentLogs)
+      window.setTimeout(() => setCreateProgressLogs(currentLogs), 0)
     }
   }, [creatingServiceId, services])
 

@@ -20,20 +20,20 @@ export default function ServiceWebView() {
   const { serviceId = "" } = useParams()
   const liveState = useHomelabLiveState()
   const services = useHomelabServices()
-  const [iframeLoaded, setIframeLoaded] = useState(false)
-  const [iframeTimedOut, setIframeTimedOut] = useState(false)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  const [timedOutUrl, setTimedOutUrl] = useState<string | null>(null)
 
   const service = services?.find((item) => item.id === serviceId) ?? null
-  const iframeUrl = useMemo(() => service?.webUrl ? resolveIframeUrl(service.webUrl) : null, [service?.webUrl])
+  const iframeUrl = useMemo(() => service?.webUrl ? resolveIframeUrl(service.webUrl) : null, [service])
+
+  const iframeLoaded = loadedUrl === iframeUrl
+  const iframeTimedOut = timedOutUrl === iframeUrl
 
   useEffect(() => {
-    setIframeLoaded(false)
-    setIframeTimedOut(false)
-
     if (!iframeUrl) return
 
     const timer = window.setTimeout(() => {
-      setIframeTimedOut(true)
+      setTimedOutUrl(iframeUrl)
     }, 4000)
 
     return () => {
@@ -125,8 +125,8 @@ export default function ServiceWebView() {
           title={`Interface ${service.label}`}
           src={iframeUrl}
           onLoad={() => {
-            setIframeLoaded(true)
-            setIframeTimedOut(false)
+            setLoadedUrl(iframeUrl)
+            setTimedOutUrl(null)
           }}
           style={{ width: "100%", height: "100%", minHeight: "70vh", border: 0 }}
         />
