@@ -1,0 +1,12 @@
+[Unit]
+Description=HomeServerManager SQLite backup
+After=homelab-backend.service
+
+[Service]
+Type=oneshot
+User=homelab
+Group=homelab
+EnvironmentFile=/etc/homeservermanager/backend.env
+ExecStart=/opt/homeservermanager/deploy/backup-sqlite.sh
+StandardOutput=journal
+StandardError=journal

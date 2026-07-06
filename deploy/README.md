@@ -52,3 +52,50 @@ Pour une VM Ubuntu de validation, utiliser plutôt le workflow Git dédié docum
 - frontend buildé puis servi via `homelab-frontend-dev.service`
 - mises à jour via `sudo bash /usr/local/bin/update-hsm-dev.sh`
 - si `TOOL_COMMANDS` expose `update-hsm`, le frontend peut lancer cette mise à jour depuis l’onglet Tools avec suivi de progression
+
+## Backup SQLite
+
+Le répertoire `deploy/` contient un service systemd oneshot et un timer pour automatiser la sauvegarde quotidienne de la base SQLite.
+
+### Installation
+
+```bash
+# Copier les unités systemd
+sudo cp deploy/backup-sqlite.service /etc/systemd/system/
+sudo cp deploy/backup-sqlite.timer   /etc/systemd/system/
+
+# Copier le script de backup et le rendre exécutable
+sudo cp deploy/backup-sqlite.sh /opt/homeservermanager/deploy/backup-sqlite.sh
+sudo chmod +x /opt/homeservermanager/deploy/backup-sqlite.sh
+sudo chown homelab:homelab /opt/homeservermanager/deploy/backup-sqlite.sh
+
+# Créer le répertoire de backups avec les bonnes permissions
+sudo mkdir -p /var/backups/homeservermanager
+sudo chown homelab:homelab /var/backups/homeservermanager
+sudo chmod 0750 /var/backups/homeservermanager
+
+# Activer et démarrer le timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now backup-sqlite.timer
+```
+
+Le timer se déclenche chaque jour à 02h00 et conserve les 7 derniers backups (configurable via la variable `KEEP_LAST` dans le script).
+
+### Vérification
+
+```bash
+# État du timer (prochaine exécution, dernière exécution)
+systemctl status backup-sqlite.timer
+
+# Lister les backups présents
+ls -lh /var/backups/homeservermanager/
+
+# Consulter les logs du dernier backup
+journalctl -u backup-sqlite.service -n 50 --no-pager
+```
+
+### Déclenchement manuel
+
+```bash
+sudo systemctl start backup-sqlite.service
+```
