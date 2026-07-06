@@ -30,6 +30,7 @@ const docker: DockerSnapshot = {
   containers: [],
   images: [],
   volumes: [],
+  error: null,
 }
 
 const nas: NasSnapshot = {

@@ -16,6 +16,11 @@ import { badRequest } from "../shared/errors.js"
 
 const execFileAsync = promisify(execFile)
 
+interface ExecOutput {
+  stdout: string[]
+  stderr: string[]
+}
+
 export interface CommandResult {
   output: string[]
   status: "ok" | "warning" | "error"
@@ -206,12 +211,25 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   async collectDocker(): Promise<DockerSnapshot> {
-    const [containerRows, imageRows, volumeRows, statRows] = await Promise.all([
-      this.execute("docker", ["ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Mounts}}"]),
-      this.execute("docker", ["images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}"]),
-      this.execute("docker", ["volume", "ls", "--format", "{{.Name}}"]),
-      this.execute("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}"]),
+    const [containersResult, imagesResult, volumesResult, statsResult] = await Promise.all([
+      this.executeWithOutput("docker", ["ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Mounts}}"]),
+      this.executeWithOutput("docker", ["images", "--format", "{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}"]),
+      this.executeWithOutput("docker", ["volume", "ls", "--format", "{{.Name}}"]),
+      this.executeWithOutput("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}"]),
     ])
+    const imageRows = imagesResult.stdout
+    const volumeRows = volumesResult.stdout
+    const statRows = statsResult.stdout
+    const containerRows = containersResult.stdout
+
+    const dockerWarnings = [
+      ...containersResult.stderr,
+      ...imagesResult.stderr,
+      ...volumesResult.stderr,
+      ...statsResult.stderr,
+    ]
+    const error = dockerWarnings.length > 0 ? [...new Set(dockerWarnings)].join("\n") : null
+
     const images = imageRows.map((row) => {
       const [id = "", name = "<none>", tag = "latest", created = "", size = "0"] = row.split("\t")
       return { id, name, tag, created, sizeMB: parseDockerSize(size) }
@@ -234,7 +252,7 @@ export class LocalSystemAdapter implements SystemAdapter {
         lastStarted: "reported by Docker",
       }
     })
-    return { containers, images, volumes }
+    return { containers, images, volumes, error }
   }
 
   async collectNas(): Promise<NasSnapshot> {
@@ -268,13 +286,21 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   private async execute(executable: string, args: string[]): Promise<string[]> {
+    const result = await this.executeWithOutput(executable, args)
+    return result.stdout
+  }
+
+  private async executeWithOutput(executable: string, args: string[]): Promise<ExecOutput> {
     try {
       const { stdout, stderr } = await execFileAsync(executable, args, {
         timeout: this.timeoutMs,
         maxBuffer: 1_024 * 1_024,
         windowsHide: true,
       })
-      return `${stdout}${stderr}`.trim().split("\n").filter(Boolean)
+      return {
+        stdout: stdout.trim().split("\n").map((line) => line.trim()).filter(Boolean),
+        stderr: stderr.trim().split("\n").map((line) => line.trim()).filter(Boolean),
+      }
     } catch (error) {
       if (error instanceof Error && "stderr" in error) {
         const stderr = String((error as { stderr?: string }).stderr ?? "").trim()

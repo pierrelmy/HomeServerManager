@@ -45,7 +45,7 @@ export type CreateServiceInput = z.infer<typeof createServiceSchema>
 export interface DockerContainer { id: string; name: string; imageId: string; volumeId: string; cpuPercent: number; lastStarted: string }
 export interface DockerImage { id: string; name: string; tag: string; created: string; sizeMB: number }
 export interface DockerVolume { id: string; name: string; sizeMB: number; created: string }
-export interface DockerSnapshot { containers: DockerContainer[]; images: DockerImage[]; volumes: DockerVolume[] }
+export interface DockerSnapshot { containers: DockerContainer[]; images: DockerImage[]; volumes: DockerVolume[]; error: string | null }
 
 export interface NasPool { name: string; type: string; used: number; total: number; temp: number; health: "Healthy" | "Warning" }
 export interface NasDrive { slot: string; model: string; temp: number; status: "Healthy" | "Warning" }

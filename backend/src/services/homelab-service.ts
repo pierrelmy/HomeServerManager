@@ -208,6 +208,16 @@ export class HomelabService {
     if (dockerResult?.status === "fulfilled" && dockerResult.value) {
       this.repository.saveDocker(dockerResult.value)
       this.events.broadcast({ type: "docker.updated", docker: dockerResult.value })
+    } else if (dockerResult?.status === "rejected") {
+      const error = dockerResult.reason instanceof Error ? dockerResult.reason.message : String(dockerResult.reason)
+      const failedDockerSnapshot = {
+        containers: [],
+        images: [],
+        volumes: [],
+        error,
+      }
+      this.repository.saveDocker(failedDockerSnapshot)
+      this.events.broadcast({ type: "docker.updated", docker: failedDockerSnapshot })
     }
     if (nasResult?.status === "fulfilled" && nasResult.value) {
       this.repository.saveNas(nasResult.value)

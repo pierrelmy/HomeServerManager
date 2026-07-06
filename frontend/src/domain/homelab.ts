@@ -95,6 +95,7 @@ export interface DockerSnapshot {
   containers: DockerContainer[]
   images: DockerImage[]
   volumes: DockerVolume[]
+  error: string | null
 }
 
 export interface NasPool {

@@ -28,6 +28,7 @@ export const dockerSeed: DockerSnapshot = {
   containers: [],
   images: [],
   volumes: [],
+  error: null,
 }
 
 export const nasSeed: NasSnapshot = {

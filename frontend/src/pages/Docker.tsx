@@ -180,6 +180,7 @@ export default function DockerPage() {
   const [searchStr, setSearchStr] = useState("")
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const runContainerAction = async (action: DockerAction["id"], resourceId: string) => {
     if (action !== "start" && action !== "stop" && action !== "restart") return
@@ -208,6 +209,15 @@ export default function DockerPage() {
       setActionError(error instanceof Error ? error.message : "L’action Docker a échoué")
     } finally {
       setBusyAction(null)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshError(null)
+    try {
+      await liveManager.refreshAll()
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error.message : "Le rafraîchissement Docker a échoué")
     }
   }
 
@@ -273,13 +283,20 @@ export default function DockerPage() {
               onChange={(event) => setSearchStr(event.target.value)}
               className="w-full sm:min-w-[20rem] sm:max-w-[420px]"
             />
-            <Button variant="secondary" onClick={() => void liveManager.refreshAll()}>
+            <Button variant="secondary" onClick={() => void handleRefresh()}>
               <IconRefresh />
             </Button>
           </div>
         )}
       />
 
+      {snapshot.error ? (
+        <Alert tone="danger">
+          Docker n’a pas pu être chargé correctement. {snapshot.error}
+        </Alert>
+      ) : null}
+
+      {refreshError ? <Alert tone="danger">{refreshError}</Alert> : null}
       {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -293,7 +310,7 @@ export default function DockerPage() {
           <SectionTitle title="Containers" />
           <div className="flex flex-col gap-3">
             {displayedContainers.length <= 0 ? (
-              <EmptyState title="Aucun conteneur ne correspond à cette recherche" />
+              <EmptyState title={snapshot.error ? "Impossible de lister les conteneurs Docker" : "Aucun conteneur ne correspond à cette recherche"} />
             ) : (
               displayedContainers.map((container) => (
                 <ContainerCard
@@ -313,7 +330,7 @@ export default function DockerPage() {
           <SectionTitle title="Images" />
           <div className="flex flex-col gap-3">
             {displayedImages.length <= 0 ? (
-              <EmptyState title="Aucune image ne correspond à cette recherche" />
+              <EmptyState title={snapshot.error ? "Impossible de lister les images Docker" : "Aucune image ne correspond à cette recherche"} />
             ) : (
               displayedImages.map((image) => (
                 <ImageCard
@@ -331,7 +348,7 @@ export default function DockerPage() {
           <SectionTitle title="Volumes" />
           <div className="flex flex-col gap-3">
             {displayedVolumes.length <= 0 ? (
-              <EmptyState title="Aucun volume ne correspond à cette recherche" />
+              <EmptyState title={snapshot.error ? "Impossible de lister les volumes Docker" : "Aucun volume ne correspond à cette recherche"} />
             ) : (
               displayedVolumes.map((volume) => <VolumeCard volume={volume} key={volume.id} />)
             )}
