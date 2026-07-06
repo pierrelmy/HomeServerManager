@@ -8,5 +8,5 @@ test("loads the dashboard and starts a service", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Services/ })).toBeVisible()
   await page.getByPlaceholder("Rechercher un service").fill("Jenkins")
   await page.getByRole("button", { name: "Démarrer" }).click()
-  await expect(page.locator("span.fw-medium", { hasText: "Running" })).toBeVisible()
+  await expect(page.locator(".service-card").getByText("Running")).toBeVisible()
 })

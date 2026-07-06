@@ -78,27 +78,28 @@ function UpdateProgressToast() {
   const update = tools?.updateStatus
   const [hiddenForFinishedAt, setHiddenForFinishedAt] = useState<string | null>(null)
   const hidden = hiddenForFinishedAt !== null && hiddenForFinishedAt === update?.finishedAt
+  const updateStatus = update?.status ?? "idle"
+  const finishedAt = update?.finishedAt ?? null
 
   useEffect(() => {
-    if (!update || update.status === "idle") {
+    if (updateStatus === "idle") {
       return
     }
 
     const interval = window.setInterval(() => {
       void liveManager.refreshTools()
-    }, update.status === "running" ? 2000 : 5000)
+    }, updateStatus === "running" ? 2000 : 5000)
 
     return () => window.clearInterval(interval)
-  }, [liveManager, update?.status])
+  }, [liveManager, updateStatus])
 
   useEffect(() => {
-    if (!update?.finishedAt) return
-    const finishedAt = update.finishedAt
-    const delay = update.status === "completed" ? 5_000 : 60_000
+    if (!finishedAt) return
+    const delay = updateStatus === "completed" ? 5_000 : 60_000
     const remaining = Math.max(0, new Date(finishedAt).getTime() + delay - Date.now())
     const timer = window.setTimeout(() => setHiddenForFinishedAt(finishedAt), remaining)
     return () => window.clearTimeout(timer)
-  }, [update?.finishedAt, update?.status])
+  }, [finishedAt, updateStatus])
 
   if (!update || update.status === "idle" || hidden) {
     return null

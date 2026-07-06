@@ -660,7 +660,7 @@ export default function Services() {
 
       {displayedLogsServiceId.trim() !== "" ? (
       <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/60 backdrop-blur-sm">
-        <div className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+        <div role="dialog" aria-label="Logs service" className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Logs service</div>

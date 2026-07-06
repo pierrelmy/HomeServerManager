@@ -28,7 +28,7 @@ test.describe("Terminal", () => {
   })
 
   test("saisir une commande et l'envoyer via Entrée → une ligne de résultat apparaît", async ({ page }) => {
-    const input = page.getByPlaceholder(/Tape une commande/)
+    const input = page.locator("form input")
     await input.fill("df -h")
     await input.press("Enter")
 
@@ -37,7 +37,7 @@ test.describe("Terminal", () => {
   })
 
   test("saisir une commande et cliquer Exécuter → une ligne de résultat apparaît", async ({ page }) => {
-    const input = page.getByPlaceholder(/Tape une commande/)
+    const input = page.locator("form input")
     await input.fill("uptime")
     await page.getByRole("button", { name: "Exécuter" }).click()
 
@@ -50,12 +50,12 @@ test.describe("Terminal", () => {
     // Le mock définit quickCommands: ["uptime", "docker ps", "df -h", "journalctl -p err -n 5"]
     await page.getByRole("button", { name: "docker ps" }).click()
 
-    const input = page.getByPlaceholder(/Tape une commande/)
+    const input = page.locator("form input")
     await expect(input).toHaveValue("docker ps")
   })
 
   test("commande inconnue → réponse simulée générique affichée", async ({ page }) => {
-    const input = page.getByPlaceholder(/Tape une commande/)
+    const input = page.locator("form input")
     await input.fill("ls -la")
     await input.press("Enter")
 

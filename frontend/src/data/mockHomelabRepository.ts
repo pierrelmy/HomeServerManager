@@ -12,7 +12,7 @@ import type {
 import type { HomelabRepository } from "./homelabRepository"
 
 const overview: OverviewSnapshot = {
-  hostName: "Homelab",
+  hostName: "homeserver01",
   uptime: "0j 0h",
   metrics: [
     { label: "CPU", value: "0%", accent: "#185FA5", points: [] },
@@ -24,7 +24,44 @@ const overview: OverviewSnapshot = {
   logs: [],
 }
 
-const services: ServiceRecord[] = []
+const services: ServiceRecord[] = [
+  {
+    id: "ollama",
+    label: "Ollama",
+    desc: "LLM local",
+    location: "ollama.service",
+    unit: "ollama.service",
+    servicePath: null,
+    webUrl: null,
+    status: "failed",
+    logs: [
+      { timestamp: "00:00:01", verbosity: "info", content: "Starting the service..." },
+      { timestamp: "00:00:02", verbosity: "error", content: "Failed to start ollama.service: exit code 1" },
+    ],
+  },
+  {
+    id: "jenkins",
+    label: "Jenkins",
+    desc: "Serveur CI/CD",
+    location: "jenkins.service",
+    unit: "jenkins.service",
+    servicePath: null,
+    webUrl: null,
+    status: "stopped",
+    logs: [],
+  },
+  {
+    id: "docker-engine",
+    label: "Docker Engine",
+    desc: "Moteur de conteneurs",
+    location: "docker.service",
+    unit: "docker.service",
+    servicePath: null,
+    webUrl: null,
+    status: "running",
+    logs: [],
+  },
+]
 
 const docker: DockerSnapshot = {
   containers: [],
@@ -65,10 +102,13 @@ const terminal: TerminalSnapshot = {
     {
       id: "terminal",
       title: "Terminal",
-      prompt: "homelab:~$",
+      prompt: "pierre@homeserver01:~$",
       status: "connected",
       quickCommands: ["uptime", "docker ps", "df -h", "journalctl -p err -n 5"],
-      lines: [],
+      lines: [
+        { command: "uptime", output: [" 10:32:14 up 3 days, 4:17, 1 user, load average: 0.12, 0.08, 0.05"], status: "ok", timestamp: "10:32:14" },
+        { command: "docker ps", output: ["CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS   NAMES"], status: "ok", timestamp: "10:32:20" },
+      ],
     },
   ],
 }
@@ -157,8 +197,11 @@ export function createMockHomelabRepository(): HomelabRepository {
       if (!service) throw new Error("Service introuvable dans le mode mock.")
       return delay(service)
     },
-    actOnService: async () => {
-      throw new Error("Aucun service n'est configuré dans ce mode.")
+    actOnService: async (id, action) => {
+      const service = services.find((item) => item.id === id)
+      if (!service) throw new Error("Service introuvable dans le mode mock.")
+      service.status = action === "stop" ? "stopped" : "running"
+      return delay({ ...service })
     },
     actOnContainer: async () => {
       throw new Error("Aucun conteneur n'est configuré dans ce mode.")

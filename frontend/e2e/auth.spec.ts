@@ -26,7 +26,7 @@ test.describe("Authentification", () => {
 
     // En mode mock, signIn accepte n'importe quels identifiants
     await page.getByLabel("Email").fill("admin@homelab.local")
-    await page.getByLabel("Mot de passe").fill("password")
+    await page.locator('input[type="password"]').fill("password")
     await page.getByRole("button", { name: "Se connecter" }).click()
 
     await expect(page.getByRole("heading", { name: "homeserver01" })).toBeVisible()

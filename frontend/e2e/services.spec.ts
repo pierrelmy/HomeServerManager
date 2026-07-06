@@ -17,9 +17,10 @@ test.describe("Services", () => {
     await expect(page.getByText("Docker Engine")).toBeVisible()
   })
 
-  test("affiche le nombre de services dans le heading", async ({ page }) => {
-    // Le heading est "Services • 3"
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("3")
+  test("affiche le compteur de services suivis", async ({ page }) => {
+    // Le StatTile "Services suivis" affiche 3
+    await expect(page.getByText("Services suivis")).toBeVisible()
+    await expect(page.locator(".service-card")).toHaveCount(3)
   })
 
   test("recherche filtre la liste par nom de service", async ({ page }) => {
@@ -51,18 +52,18 @@ test.describe("Services", () => {
 
   test("bouton Démarrer visible sur un service arrêté (Jenkins)", async ({ page }) => {
     // Jenkins est "stopped" → bouton Démarrer disponible
-    const jenkinsCard = page.locator(".border.rounded.p-3", { hasText: "Jenkins" })
+    const jenkinsCard = page.locator(".service-card", { hasText: "Jenkins" })
     await expect(jenkinsCard.getByRole("button", { name: "Démarrer" })).toBeVisible()
   })
 
   test("bouton Arrêter visible sur un service en cours (Docker Engine)", async ({ page }) => {
     // Docker Engine est "running" → bouton Arrêter disponible
-    const dockerCard = page.locator(".border.rounded.p-3", { hasText: "Docker Engine" })
+    const dockerCard = page.locator(".service-card", { hasText: "Docker Engine" })
     await expect(dockerCard.getByRole("button", { name: "Arrêter" })).toBeVisible()
   })
 
   test("bouton Redémarrer visible sur un service en cours (Docker Engine)", async ({ page }) => {
-    const dockerCard = page.locator(".border.rounded.p-3", { hasText: "Docker Engine" })
+    const dockerCard = page.locator(".service-card", { hasText: "Docker Engine" })
     await expect(dockerCard.getByRole("button", { name: "Redémarrer" })).toBeVisible()
   })
 
@@ -71,15 +72,15 @@ test.describe("Services", () => {
     await page.getByRole("button", { name: "Démarrer" }).click()
 
     // Après l'action start, le mock met le status à "running"
-    await expect(page.locator(".fw-medium", { hasText: "Running" })).toBeVisible()
+    await expect(page.locator(".service-card").getByText("Running")).toBeVisible()
   })
 
   test("bouton Voir les logs ouvre un panneau latéral", async ({ page }) => {
     // Ollama a des logs dans le mock
-    const ollamaCard = page.locator(".border.rounded.p-3", { hasText: "Ollama" })
+    const ollamaCard = page.locator(".service-card", { hasText: "Ollama" })
     await ollamaCard.getByRole("button", { name: "Voir les logs" }).click()
 
-    // Le panneau offcanvas s'ouvre avec le titre du service
+    // Le panneau latéral s'ouvre avec le titre et le premier log
     await expect(page.getByRole("dialog")).toBeVisible()
     await expect(page.getByText("Starting the service...")).toBeVisible()
   })
