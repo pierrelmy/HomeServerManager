@@ -304,29 +304,47 @@ function ServiceCard({
 
 function KnownServiceCard({
   service,
+  disabled = false,
   onSelect,
 }: {
   service: KnownServiceTemplate
+  disabled?: boolean
   onSelect: (service: KnownServiceTemplate) => void
 }) {
   return (
     <button
       type="button"
-      className="catalog-card h-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
-      onClick={() => onSelect(service)}
+      className={`catalog-card h-full rounded-3xl border p-5 text-left shadow-sm transition ${
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500"
+          : "border-slate-200 bg-white hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
+      }`}
+      onClick={() => {
+        if (!disabled) onSelect(service)
+      }}
+      disabled={disabled}
+      aria-disabled={disabled}
     >
       <div className="mb-3 flex items-center gap-3">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-          <service.icon size={22} className="text-slate-600 dark:text-slate-300" />
+        <div className={`rounded-2xl border p-3 ${disabled ? "border-slate-200 bg-slate-200 dark:border-slate-700 dark:bg-slate-800" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"}`}>
+          <service.icon size={22} className={disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-600 dark:text-slate-300"} />
         </div>
         <div className="min-w-0">
-          <div className="text-lg font-semibold text-slate-950 dark:text-slate-50">{service.label}</div>
-          <div className="text-sm text-slate-500 dark:text-slate-400">{service.serviceUnit}</div>
+          <div className={`text-lg font-semibold ${disabled ? "text-slate-500 dark:text-slate-400" : "text-slate-950 dark:text-slate-50"}`}>{service.label}</div>
+          <div className={`text-sm ${disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-500 dark:text-slate-400"}`}>{service.serviceUnit}</div>
         </div>
       </div>
-      <div className="mb-4 text-sm leading-6 text-slate-600 dark:text-slate-300">{service.description}</div>
-      <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-slate-800/70 dark:text-slate-400">
-        {service.installCommand ? "Préremplit l’installation et le mode déjà installé." : "Préremplit le mode service déjà installé."}
+      <div className={`mb-4 text-sm leading-6 ${disabled ? "text-slate-500 dark:text-slate-400" : "text-slate-600 dark:text-slate-300"}`}>{service.description}</div>
+      <div className={`rounded-2xl px-3 py-2 text-sm ${
+        disabled
+          ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+          : "bg-slate-50 text-slate-500 dark:bg-slate-800/70 dark:text-slate-400"
+      }`}>
+        {disabled
+          ? "Déjà installé"
+          : service.installCommand
+            ? "Préremplit l’installation et le mode déjà installé."
+            : "Préremplit le mode service déjà installé."}
       </div>
     </button>
   )
@@ -447,6 +465,23 @@ export default function Services() {
   const displayedLogs = useMemo(() => {
     return services?.find((service) => service.id === displayedLogsServiceId)?.logs ?? []
   }, [displayedLogsServiceId, services])
+
+  const installedKnownServiceKeys = useMemo(() => {
+    return new Set(
+      (services ?? []).flatMap((service) => {
+        const keys = [
+          service.id.trim().toLowerCase(),
+          service.unit.trim().toLowerCase(),
+        ]
+
+        if (service.servicePath) {
+          keys.push(service.servicePath.trim().toLowerCase())
+        }
+
+        return keys.filter((key) => key !== "")
+      }),
+    )
+  }, [services])
 
   useEffect(() => {
     if (!creatingServiceId) return
@@ -707,7 +742,15 @@ export default function Services() {
               <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {knownServices.map((service) => (
                   <div key={service.id}>
-                    <KnownServiceCard service={service} onSelect={applyKnownService} />
+                    <KnownServiceCard
+                      service={service}
+                      disabled={
+                        installedKnownServiceKeys.has(service.id.toLowerCase())
+                        || installedKnownServiceKeys.has(service.serviceUnit.toLowerCase())
+                        || (service.servicePath ? installedKnownServiceKeys.has(service.servicePath.toLowerCase()) : false)
+                      }
+                      onSelect={applyKnownService}
+                    />
                   </div>
                 ))}
               </div>
