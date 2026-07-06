@@ -434,17 +434,12 @@ export class HomelabService {
     const terminal = this.repository.getTerminal()
     const sessionId = requestedSessionId ?? terminal.activeSessionId
     if (!terminal.sessions.some((session) => session.id === sessionId)) throw notFound(`Unknown terminal session: ${sessionId}`)
-    const normalized = command.trim().replace(/\s+/g, " ")
-    const allowed: Record<string, () => Pick<TerminalLine, "output" | "status">> = {
-      "uptime": () => ({ status: "ok", output: [`up ${Math.floor(systemUptime() / 86_400)} days, load average: ${loadavg().map((value) => value.toFixed(2)).join(", ")}`] }),
-      "docker ps": () => ({ status: "ok", output: ["NAMES                              CPU", ...this.repository.getDocker().containers.map((container) => `${container.name.padEnd(34)} ${container.cpuPercent}%`)] }),
-      "df -h": () => ({ status: "ok", output: ["Filesystem      Size  Used Avail Use% Mounted on", ...this.repository.getOverview().disks.map((disk) => `${disk.name.padEnd(15)} ${disk.total}${disk.unit} ${disk.used}${disk.unit} - ${disk.percent}%`)] }),
-      "journalctl -p err -n 5": () => ({ status: "warning", output: this.repository.getOverview().logs.filter((log) => log.level === "danger").slice(-5).map((log) => `${log.timestamp} ${log.source} ${log.content}`) }),
+    const normalized = command.trim()
+    const result = await this.system.executeTerminal(normalized) ?? {
+      status: "warning" as const,
+      output: ["Aucun adaptateur terminal n'est disponible pour cette commande."],
     }
-    const executor = allowed[normalized]
-    if (!executor) throw conflict("Command is not allowed")
-    const result = await this.system.executeTerminal(normalized) ?? executor()
-    const line: TerminalLine = { command, timestamp: timeStamp(), ...result }
+    const line: TerminalLine = { command: normalized, timestamp: timeStamp(), ...result }
     this.repository.appendTerminalLine(sessionId, line)
     this.events.broadcast({ type: "terminal.line.appended", sessionId, line, limit: 100 })
     return { sessionId, line }

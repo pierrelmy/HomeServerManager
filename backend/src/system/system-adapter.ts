@@ -57,7 +57,15 @@ export class SimulationSystemAdapter implements SystemAdapter {
   async actOnImage() {}
   async runNasScrub() {}
   async runTool() {}
-  async executeTerminal() { return null }
+  async executeTerminal(command: string) {
+    return {
+      status: "warning" as const,
+      output: [
+        `Simulation: ${command}`,
+        "Aucune commande réelle n'est exécutée dans cet environnement.",
+      ],
+    }
+  }
   async collectOverview() { return null }
   async collectServices() { return null }
   async collectDocker() { return null }
@@ -173,16 +181,7 @@ export class LocalSystemAdapter implements SystemAdapter {
   }
 
   async executeTerminal(command: string): Promise<CommandResult> {
-    const commands: Record<string, [string, string[]]> = {
-      uptime: ["uptime", []],
-      "docker ps": ["docker", ["ps", "--format", "table {{.Names}}\t{{.Status}}\t{{.CPUPerc}}"]],
-      "df -h": ["df", ["-h"]],
-      "journalctl -p err -n 5": ["journalctl", ["-p", "err", "-n", "5", "--no-pager"]],
-    }
-    const selected = commands[command]
-    if (!selected) throw new Error("Command is not allowed")
-    const output = await this.execute(selected[0], selected[1])
-    return { output, status: command.startsWith("journalctl") ? "warning" : "ok" }
+    return this.executeShellCommand(command)
   }
 
   async collectOverview(current: OverviewSnapshot): Promise<OverviewSnapshot> {
@@ -288,6 +287,39 @@ export class LocalSystemAdapter implements SystemAdapter {
   private async execute(executable: string, args: string[]): Promise<string[]> {
     const result = await this.executeWithOutput(executable, args)
     return result.stdout
+  }
+
+  private async executeShellCommand(command: string): Promise<CommandResult> {
+    try {
+      const { stdout, stderr } = await execFileAsync("/bin/bash", ["-lc", command], {
+        timeout: this.timeoutMs,
+        maxBuffer: 1_024 * 1_024,
+        windowsHide: true,
+      })
+      const stdoutLines = stdout.trim().split("\n").map((line) => line.trimEnd()).filter(Boolean)
+      const stderrLines = stderr.trim().split("\n").map((line) => line.trimEnd()).filter(Boolean)
+      return {
+        output: [...stdoutLines, ...stderrLines],
+        status: stderrLines.length > 0 ? "warning" : "ok",
+      }
+    } catch (error) {
+      if (error instanceof Error && ("stderr" in error || "stdout" in error)) {
+        const stdout = String((error as { stdout?: string }).stdout ?? "")
+        const stderr = String((error as { stderr?: string }).stderr ?? "")
+        const output = `${stdout}\n${stderr}`
+          .split("\n")
+          .map((line) => line.trimEnd())
+          .filter(Boolean)
+        return {
+          output: output.length > 0 ? output : [error.message],
+          status: "error",
+        }
+      }
+      return {
+        output: [error instanceof Error ? error.message : String(error)],
+        status: "error",
+      }
+    }
   }
 
   private async executeWithOutput(executable: string, args: string[]): Promise<ExecOutput> {

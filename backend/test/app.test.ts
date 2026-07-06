@@ -229,19 +229,26 @@ describe("homelab API", () => {
     ]))
   })
 
-  it("only executes allowlisted terminal commands", async () => {
+  it("executes terminal commands and records them", async () => {
     const instance = await setup()
     const cookie = await login(instance)
-    const rejected = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "rm -rf /" } })
-    expect(rejected.statusCode).toBe(409)
-
-    const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "uptime" } })
+    const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "printf 'hello'" } })
     expect(accepted.statusCode, accepted.body).toBe(201)
-    expect(accepted.json()).toMatchObject({ sessionId: "terminal", line: { command: "uptime", status: "ok" } })
+    expect(accepted.json()).toMatchObject({
+      sessionId: "terminal",
+      line: {
+        command: "printf 'hello'",
+        status: "warning",
+        output: [
+          "Simulation: printf 'hello'",
+          "Aucune commande réelle n'est exécutée dans cet environnement.",
+        ],
+      },
+    })
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
     expect(audit.json()).toEqual(expect.arrayContaining([
-      expect.objectContaining({ action: "terminal.execute", resource: "rm -rf /", outcome: "failure" }),
+      expect.objectContaining({ action: "terminal.execute", resource: "printf 'hello'", outcome: "success" }),
     ]))
   })
 
