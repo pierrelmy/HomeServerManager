@@ -131,7 +131,7 @@ export default function TerminalPage() {
           </Surface>
         </div>
 
-        <div>
+        {/* <div>
           <Surface>
             <SectionTitle title="Raccourcis" subtitle="Préremplit une commande dans le champ." />
             <div className="grid gap-2">
@@ -153,7 +153,7 @@ export default function TerminalPage() {
               ))}
             </div>
           </Surface>
-        </div>
+        </div> */}
       </div>
     </PageShell>
   )
