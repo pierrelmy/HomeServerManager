@@ -126,6 +126,7 @@ id homelab
 ```bash
 sudo mkdir -p /srv/homeservermanager-dev
 sudo mkdir -p /var/lib/homeservermanager
+sudo mkdir -p /var/lib/homeservermanager/docker
 sudo mkdir -p /etc/homeservermanager
 sudo mkdir -p /usr/local/libexec/homeservermanager
 sudo chown -R ubuntu:ubuntu /srv/homeservermanager-dev

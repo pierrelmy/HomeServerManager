@@ -109,6 +109,7 @@ ensure_user() {
 ensure_directories() {
   install -d -o "$VM_USER" -g "$VM_USER" "$ROOT"
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" /var/lib/homeservermanager
+  install -d -o "$SERVICE_USER" -g "$SERVICE_USER" /var/lib/homeservermanager/docker
   install -d -o root -g root /etc/homeservermanager
   install -d -o root -g root /usr/local/libexec/homeservermanager
   install -d -o root -g root /usr/local/libexec/homeservermanager/installers

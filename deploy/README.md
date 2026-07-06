@@ -4,6 +4,7 @@
 
 1. Installer Node.js 24, Docker, Docker Compose, Caddy via la stack fournie, SQLite, `sudo` et les outils système utilisés.
 2. Créer l’utilisateur `homelab`, l’ajouter au groupe `docker` et créer `/opt/homeservermanager` ainsi que `/var/lib/homeservermanager`.
+   Créer aussi `/var/lib/homeservermanager/docker`, appartenant à `homelab:homelab`, pour servir de `DOCKER_CONFIG` au backend.
 3. Copier `homelab-backend.service` dans `/etc/systemd/system/homeservermanager.service`.
 4. Copier `homelab-sudoers` dans `/etc/sudoers.d/homeservermanager`, adapter l’allowlist et valider avec `visudo -cf`.
    Copier aussi les scripts requis depuis `deploy/scripts` vers `/usr/local/libexec/homeservermanager`, appartenant à root et non modifiables par l’utilisateur `homelab`.

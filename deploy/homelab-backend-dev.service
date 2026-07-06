@@ -10,6 +10,7 @@ Group=homelab
 SupplementaryGroups=docker
 WorkingDirectory=/srv/homeservermanager-dev/backend
 EnvironmentFile=/srv/homeservermanager-dev/backend/.env
+Environment=DOCKER_CONFIG=/var/lib/homeservermanager/docker
 ExecStart=/usr/bin/node /srv/homeservermanager-dev/backend/dist/server.js
 Restart=on-failure
 RestartSec=5
