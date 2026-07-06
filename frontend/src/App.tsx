@@ -95,7 +95,7 @@ function UpdateProgressToast() {
 
   if (update.finishedAt) {
     const elapsedMs = Date.now() - new Date(update.finishedAt).getTime()
-    if (update.status === "completed" && elapsedMs > 20_000) return null
+    if (update.status === "completed" && elapsedMs > 5_000) return null
     if (update.status === "failed" && elapsedMs > 60_000) return null
   }
 
