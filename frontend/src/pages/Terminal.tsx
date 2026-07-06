@@ -57,7 +57,7 @@ export default function TerminalPage() {
       </Alert>
 
       <div className="min-w-0">
-        <Surface className="h-full">
+        <Surface className="flex h-full flex-col">
             <SectionTitle
               title="Console"
               subtitle="Historique de la session active et sortie des dernières commandes."
@@ -68,7 +68,7 @@ export default function TerminalPage() {
                 </div>
               )}
             />
-            <div className="terminal-surface">
+            <div className="terminal-surface flex-1">
               {activeSession.lines.length > 0 ? activeSession.lines.map((line, index) => (
                 <div key={`${line.command}-${index}`} className="terminal-entry">
                   <div className="terminal-entry__meta">

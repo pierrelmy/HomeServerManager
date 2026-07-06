@@ -46,6 +46,7 @@ textarea {
 }
 
 .terminal-surface {
+  height: min(65vh, 42rem);
   min-height: 26rem;
   overflow: auto;
   border-radius: 1.5rem;
