@@ -56,9 +56,8 @@ export default function TerminalPage() {
         </div>
       </Alert>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-        <div>
-          <Surface className="h-full">
+      <div className="min-w-0">
+        <Surface className="h-full">
             <SectionTitle
               title="Console"
               subtitle="Historique de la session active et sortie des dernières commandes."
@@ -124,8 +123,7 @@ export default function TerminalPage() {
                 Exécuter
               </Button>
             </form>
-          </Surface>
-        </div>
+        </Surface>
       </div>
     </PageShell>
   )
