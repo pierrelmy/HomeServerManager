@@ -13,7 +13,20 @@ Le workflow GitHub `Deploy production` exécute déjà un smoke test backend (`/
 
 ## Sauvegarde
 
-Arrêter brièvement le service ou utiliser l’API SQLite de sauvegarde, puis copier `/var/lib/homeservermanager/homelab.db`. Sauvegarder aussi `/etc/homeservermanager/backend.env` dans un coffre chiffré. Tester une restauration au moins une fois par trimestre.
+Un timer systemd automatise la sauvegarde quotidienne à 02h00 (voir `deploy/backup-sqlite.timer`). Il conserve les 7 derniers backups dans `/var/backups/homeservermanager/`.
+
+```bash
+# Vérifier l’état du timer
+systemctl status backup-sqlite.timer
+
+# Consulter les logs du dernier backup
+journalctl -u backup-sqlite.service -n 20 --no-pager
+
+# Déclencher manuellement
+sudo systemctl start backup-sqlite.service
+```
+
+Pour un backup ad hoc, copier directement `/var/lib/homeservermanager/homelab.db` après avoir arrêté brièvement le service (ou en mode `SYSTEM_ADAPTER=simulation` où SQLite n’est pas soumis à des écritures concurrentes). Sauvegarder aussi `/etc/homeservermanager/backend.env` dans un coffre chiffré. Tester une restauration au moins une fois par trimestre.
 
 ## Restauration
 
