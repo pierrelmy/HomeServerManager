@@ -1,8 +1,8 @@
 import { useState } from "react"
-import { Badge, Button, Card, Form, Alert } from "react-bootstrap"
-import { IconDeviceFloppy, IconSettings } from "@tabler/icons-react"
+import { IconDeviceFloppy } from "@tabler/icons-react"
 import type { SettingsState } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabSettings } from "../live/useHomelabLive"
+import { Alert, Button, Field, PageHeader, PageShell, SectionTitle, Select, StatTile, StatusBadge, Surface, Toggle } from "../components/ui"
 
 export default function SettingsPage() {
   const liveManager = useHomelabLiveManager()
@@ -35,108 +35,90 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="d-flex flex-column gap-4 p-3 p-lg-4">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+    <PageShell>
+      <PageHeader
+        eyebrow="Preferences"
+        title="Settings"
+        description="Réglages visuels et comportementaux du tableau de bord."
+        actions={
+          <Button className="flex items-center gap-2" disabled={saving} onClick={() => void handleSave()}>
+            <IconDeviceFloppy size={18} />
+            Enregistrer
+          </Button>
+        }
+      />
+
+      {saveMessage ? <Alert tone="success">{saveMessage}</Alert> : null}
+      {saveError ? <Alert tone="danger">{saveError}</Alert> : null}
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div><StatTile label="Thème" value={currentSettings.theme} tone="primary" /></div>
+        <div><StatTile label="Densité" value={`${currentSettings.density}%`} /></div>
+        <div><StatTile label="Alertes" value={currentSettings.alertsEnabled ? "On" : "Off"} tone={currentSettings.alertsEnabled ? "success" : "neutral"} /></div>
+        <div><StatTile label="Sidebar" value={currentSettings.compactSidebar ? "Compacte" : "Large"} /></div>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <div>
-          <p className="text-uppercase text-secondary small mb-1">Préférences</p>
-          <h1 className="mb-0">Settings</h1>
-          <p className="text-secondary mb-0">Réglages visuels et comportementaux du tableau de bord.</p>
-        </div>
+          <Surface>
+            <SectionTitle title="Interface" subtitle="Réglages d’affichage et d’ergonomie." />
 
-        <Button className="d-flex align-items-center gap-2" disabled={saving} onClick={() => void handleSave()}>
-          <IconDeviceFloppy size={18} />
-          Enregistrer
-        </Button>
-      </div>
-
-      {saveMessage ? <Alert variant="success" className="mb-0">{saveMessage}</Alert> : null}
-      {saveError ? <Alert variant="danger" className="mb-0">{saveError}</Alert> : null}
-
-      <div className="row g-3">
-        <div className="col-12 col-xl-7">
-          <Card>
-            <Card.Body className="d-flex flex-column gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <IconSettings size={18} />
-                  <h2 className="h5 mb-0">Interface</h2>
-                </div>
-
-                <div className="row g-3">
-                  <div className="col-12 col-md-6">
-                    <Form.Group>
-                      <Form.Label>Thème</Form.Label>
-                      <Form.Select value={currentSettings.theme} onChange={(event) => setDraftSettings({ ...currentSettings, theme: event.target.value as SettingsState["theme"] })}>
-                        <option value="system">Système</option>
-                        <option value="light">Clair</option>
-                        <option value="dark">Sombre</option>
-                      </Form.Select>
-                    </Form.Group>
-                  </div>
-
-                  <div className="col-12 col-md-6">
-                    <Form.Group>
-                      <Form.Label>Dense UI: {currentSettings.density}%</Form.Label>
-                      <Form.Range value={currentSettings.density} onChange={(event) => setDraftSettings({ ...currentSettings, density: Number(event.target.value) })} />
-                    </Form.Group>
-                  </div>
-                </div>
+                <Field label="Thème">
+                  <Select value={currentSettings.theme} onChange={(event) => setDraftSettings({ ...currentSettings, theme: event.target.value as SettingsState["theme"] })}>
+                    <option value="system">Système</option>
+                    <option value="light">Clair</option>
+                    <option value="dark">Sombre</option>
+                  </Select>
+                </Field>
               </div>
 
               <div>
-                <h2 className="h5 mb-3">Notifications</h2>
-                <div className="d-flex flex-column gap-3">
-                  <Form.Check
-                    type="switch"
-                    id="alerts-enabled"
-                    label="Alertes système"
-                    checked={currentSettings.alertsEnabled}
-                    onChange={(event) => setDraftSettings({ ...currentSettings, alertsEnabled: event.target.checked })}
+                <Field label={`Densité UI : ${currentSettings.density}%`}>
+                  <input
+                    type="range"
+                    min={80}
+                    max={110}
+                    value={currentSettings.density}
+                    onChange={(event) => setDraftSettings({ ...currentSettings, density: Number(event.target.value) })}
+                    className="w-full accent-sky-600"
                   />
-                  <Form.Check
-                    type="switch"
-                    id="compact-sidebar"
-                    label="Sidebar compacte"
-                    checked={currentSettings.compactSidebar}
-                    onChange={(event) => setDraftSettings({ ...currentSettings, compactSidebar: event.target.checked })}
-                  />
-                </div>
+                </Field>
               </div>
-            </Card.Body>
-          </Card>
+            </div>
+
+            <div className="mt-6">
+              <SectionTitle title="Comportement" subtitle="Préférences applicatives pour ta session." />
+              <div className="flex flex-col gap-3">
+                <Toggle label="Alertes système" checked={currentSettings.alertsEnabled} onChange={(checked) => setDraftSettings({ ...currentSettings, alertsEnabled: checked })} />
+                <Toggle label="Sidebar compacte" checked={currentSettings.compactSidebar} onChange={(checked) => setDraftSettings({ ...currentSettings, compactSidebar: checked })} />
+              </div>
+            </div>
+          </Surface>
         </div>
 
-        <div className="col-12 col-xl-5">
-          <Card className="h-100">
-            <Card.Body className="d-flex flex-column gap-3">
-              <h2 className="h5 mb-0">État courant</h2>
-              <div className="d-flex flex-wrap gap-2">
-                  <Badge bg="light" text="dark">
-                  Theme: {currentSettings.theme}
-                  </Badge>
-                  <Badge bg="light" text="dark">
-                  Density: {currentSettings.density}%
-                  </Badge>
-                <Badge bg={currentSettings.alertsEnabled ? "success" : "secondary"}>
-                  Alerts {currentSettings.alertsEnabled ? "on" : "off"}
-                </Badge>
-                <Badge bg={currentSettings.compactSidebar ? "success" : "secondary"}>
-                  Sidebar {currentSettings.compactSidebar ? "compact" : "wide"}
-                </Badge>
-              </div>
+        <div>
+          <Surface className="h-full">
+            <SectionTitle title="État courant" subtitle="Résumé des paramètres actifs." />
+            <div className="mb-4 flex flex-wrap gap-2">
+              <StatusBadge>{currentSettings.theme}</StatusBadge>
+              <StatusBadge>{currentSettings.density}%</StatusBadge>
+              <StatusBadge tone={currentSettings.alertsEnabled ? "success" : "neutral"}>Alerts {currentSettings.alertsEnabled ? "on" : "off"}</StatusBadge>
+              <StatusBadge tone={currentSettings.compactSidebar ? "success" : "neutral"}>Sidebar {currentSettings.compactSidebar ? "compact" : "wide"}</StatusBadge>
+            </div>
 
-              <div className="border rounded p-3">
-                <div className="fw-semibold mb-2">Notes</div>
-                <ul className="text-secondary mb-0">
-                  <li>Les changements restent locaux tant qu’aucun backend n’est branché.</li>
-                  <li>Les réglages peuvent plus tard être persistés par utilisateur.</li>
-                  <li>Le slider sert surtout à simuler un paramètre de densité globale.</li>
-                </ul>
-              </div>
-            </Card.Body>
-          </Card>
+            <div className="data-card">
+              <div className="mb-2 font-semibold text-slate-900 dark:text-slate-100">Notes</div>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+                <li>Les changements sont enregistrés par le backend puis renvoyés au frontend.</li>
+                <li>Les réglages sont partagés avec la session connectée sur cette instance.</li>
+                <li>Le slider de densité reste un réglage de présentation du dashboard.</li>
+              </ul>
+            </div>
+          </Surface>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

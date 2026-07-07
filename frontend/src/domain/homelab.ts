@@ -45,11 +45,24 @@ export interface ServiceLogEntry {
   content: string
 }
 
+export interface CreateServiceInput {
+  label: string
+  description?: string
+  serviceUnit: string
+  servicePath?: string
+  installCommand?: string
+  webUrl?: string
+  startAfterInstall: boolean
+}
+
 export interface ServiceRecord {
   id: string
   label: string
   desc: string
   location: string
+  unit: string
+  servicePath: string | null
+  webUrl: string | null
   status: ServiceStatus
   logs: ServiceLogEntry[]
 }
@@ -82,6 +95,7 @@ export interface DockerSnapshot {
   containers: DockerContainer[]
   images: DockerImage[]
   volumes: DockerVolume[]
+  error: string | null
 }
 
 export interface NasPool {
@@ -117,6 +131,7 @@ export interface NasSnapshot {
 }
 
 export interface ToolShortcut {
+  id: string
   title: string
   description: string
   tag: string
@@ -127,9 +142,22 @@ export interface ToolJob {
   when: string
 }
 
+export interface UpdateStatus {
+  status: "idle" | "running" | "completed" | "failed"
+  currentStep: number
+  totalSteps: number
+  stepLabel: string
+  startedAt: string | null
+  updatedAt: string | null
+  finishedAt: string | null
+  revision: string | null
+  error: string | null
+}
+
 export interface ToolsSnapshot {
   tools: ToolShortcut[]
   recentJobs: ToolJob[]
+  updateStatus: UpdateStatus
 }
 
 export interface TerminalLine {

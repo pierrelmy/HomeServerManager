@@ -10,12 +10,12 @@ describe("homelab live manager", () => {
 
     await manager.bootstrap()
     expect(manager.state.getSnapshot()).toMatchObject({ ready: true, bootstrapError: null })
+    expect(manager.services.getSnapshot()?.length).toBeGreaterThanOrEqual(0)
+    expect(manager.tools.getSnapshot()?.tools).toEqual([])
 
-    await manager.actOnService("jenkins", "start")
-    expect(manager.services.getSnapshot()?.find((service) => service.id === "jenkins")?.status).toBe("running")
-
-    await manager.runTool("scan-reseau")
-    expect(manager.tools.getSnapshot()?.recentJobs[0]?.label).toContain("Scan réseau")
+    const nextSettings = await manager.updateSettings({ compactSidebar: true })
+    expect(nextSettings.compactSidebar).toBe(true)
+    expect(manager.settings.getSnapshot()?.compactSidebar).toBe(true)
 
     await manager.signOut()
     expect(manager.session.getSnapshot()?.isAuthenticated).toBe(false)

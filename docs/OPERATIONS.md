@@ -7,6 +7,9 @@
 - Métriques Prometheus : `GET /metrics` avec `Authorization: Bearer $METRICS_TOKEN`
 - Logs : `journalctl -u homeservermanager`
 - Proxy : `docker compose -f deploy/compose.production.yaml logs caddy`
+- Frontend : `docker compose -f deploy/compose.production.yaml exec -T frontend wget -qO- http://localhost:8080/healthz`
+
+Le workflow GitHub `Deploy production` exécute déjà un smoke test backend (`/health`, `/ready`) et frontend (`/healthz`) après activation. En cas d’échec, considérer le déploiement comme non validé même si `systemd` est actif.
 
 ## Sauvegarde
 
@@ -21,7 +24,7 @@ Arrêter brièvement le service ou utiliser l’API SQLite de sauvegarde, puis c
 
 ## Rollback
 
-Relancer `Deploy production` avec un tag ou commit précédemment validé. Les migrations SQLite actuelles sont additives. Sauvegarder la base avant toute future migration destructive.
+Relancer `Deploy production` avec un tag ou commit précédemment validé. Les migrations SQLite actuelles sont additives. Sauvegarder la base avant toute future migration destructive. Vérifier à nouveau les smoke tests après rollback.
 
 ## Incident
 

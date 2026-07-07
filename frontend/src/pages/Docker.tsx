@@ -7,9 +7,9 @@ import {
   type IconProps,
 } from "@tabler/icons-react"
 import { useMemo, useState } from "react"
-import { Alert, Badge, Button, Form } from "react-bootstrap"
 import type { DockerContainer, DockerImage, DockerVolume } from "../domain/homelab"
 import { useHomelabDocker, useHomelabLiveManager, useHomelabLiveState } from "../live/useHomelabLive"
+import { Alert, Button, EmptyState, Input, PageHeader, PageShell, SectionTitle, StatTile, StatusBadge } from "../components/ui"
 
 interface DockerAction {
   id: "start" | "stop" | "restart" | "pull" | "run"
@@ -53,13 +53,12 @@ function ActionButtons({
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="d-flex flex-row flex-wrap gap-2 mt-3">
+    <div className="mt-3 flex flex-wrap gap-2">
       {actions.map((action) => (
         <Button
           key={action.id}
-          size="sm"
-          variant={action.variant}
-          className="d-flex align-items-center gap-1"
+          variant={action.variant === "danger" ? "danger" : action.variant === "primary" || action.variant === "success" ? "primary" : "secondary"}
+          className="flex items-center gap-1 px-3 py-2 text-xs"
           disabled={busyAction === `${resourceId}:${action.id}`}
           onClick={() => onAction(action.id, resourceId)}
         >
@@ -85,21 +84,21 @@ function ContainerCard({
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="d-flex flex-column border rounded p-3 bg-light">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
-          <h5 className="mb-1">{container.name}</h5>
-          <span className="text-secondary small">{shortId(container.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{container.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(container.id)}</span>
         </div>
 
-        <Badge bg={container.cpuPercent > 70 ? "danger" : container.cpuPercent > 40 ? "warning" : "success"}>
+        <StatusBadge tone={container.cpuPercent > 70 ? "danger" : container.cpuPercent > 40 ? "warning" : "success"}>
           CPU {container.cpuPercent}%
-        </Badge>
+        </StatusBadge>
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Image:</strong> {image ? `${image.name}:${image.tag}` : "Image inconnue"}
         </span>
@@ -122,19 +121,19 @@ function ImageCard({ image, busyAction, onAction }: {
   onAction: (action: DockerAction["id"], resourceId: string) => void
 }) {
   return (
-    <div className="d-flex flex-column border rounded p-3 bg-light">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
-          <h5 className="mb-1">{image.name}</h5>
-          <span className="text-secondary small">{shortId(image.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{image.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(image.id)}</span>
         </div>
 
-        <Badge bg="secondary">{image.tag}</Badge>
+        <StatusBadge>{image.tag}</StatusBadge>
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Taille:</strong> {image.sizeMB} MB
         </span>
@@ -150,19 +149,19 @@ function ImageCard({ image, busyAction, onAction }: {
 
 function VolumeCard({ volume }: { volume: DockerVolume }) {
   return (
-    <div className="d-flex flex-column border rounded p-3 bg-light">
-      <div className="d-flex justify-content-between align-items-start gap-3">
+    <div className="data-card flex flex-col">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div>
-          <h5 className="mb-1">{volume.name}</h5>
-          <span className="text-secondary small">{shortId(volume.id)}</span>
+          <h5 className="mb-1 text-lg font-semibold text-slate-950 dark:text-slate-50">{volume.name}</h5>
+          <span className="text-sm text-slate-500 dark:text-slate-400">{shortId(volume.id)}</span>
         </div>
 
-        <IconBox size={24} className="text-secondary" />
+        <IconBox size={24} className="text-slate-500 dark:text-slate-400" />
       </div>
 
-      <hr />
+      <div className="my-4 h-px bg-slate-200 dark:bg-slate-800" />
 
-      <div className="d-flex flex-column gap-1 small">
+      <div className="flex flex-col gap-1 text-sm">
         <span>
           <strong>Taille:</strong> {volume.sizeMB} MB
         </span>
@@ -170,7 +169,6 @@ function VolumeCard({ volume }: { volume: DockerVolume }) {
           <strong>Créé:</strong> {formatDate(volume.created)}
         </span>
       </div>
-
     </div>
   )
 }
@@ -182,6 +180,7 @@ export default function DockerPage() {
   const [searchStr, setSearchStr] = useState("")
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const runContainerAction = async (action: DockerAction["id"], resourceId: string) => {
     if (action !== "start" && action !== "stop" && action !== "restart") return
@@ -213,12 +212,19 @@ export default function DockerPage() {
     }
   }
 
+  const handleRefresh = async () => {
+    setRefreshError(null)
+    try {
+      await liveManager.refreshAll()
+    } catch (error) {
+      setRefreshError(error instanceof Error ? error.message : "Le rafraîchissement Docker a échoué")
+    }
+  }
+
   const trimmed = searchStr.trim().toLowerCase()
 
   const displayedContainers = useMemo(() => {
-    if (!snapshot) {
-      return []
-    }
+    if (!snapshot) return []
 
     return snapshot.containers.filter((container) => {
       const image = snapshot.images.find((item) => item.id === container.imageId)
@@ -236,9 +242,7 @@ export default function DockerPage() {
   }, [snapshot, trimmed])
 
   const displayedImages = useMemo(() => {
-    if (!snapshot) {
-      return []
-    }
+    if (!snapshot) return []
 
     return snapshot.images.filter(
       (image) =>
@@ -250,9 +254,7 @@ export default function DockerPage() {
   }, [snapshot, trimmed])
 
   const displayedVolumes = useMemo(() => {
-    if (!snapshot) {
-      return []
-    }
+    if (!snapshot) return []
 
     return snapshot.volumes.filter(
       (volume) =>
@@ -267,89 +269,92 @@ export default function DockerPage() {
   }
 
   return (
-    <div className="d-flex flex-column h-100 w-100 p-3 gap-3">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-        <h1 className="m-0">Docker manager</h1>
+    <PageShell>
+      <PageHeader
+        eyebrow="Containers"
+        title="Docker"
+        description="Supervision et actions courantes sur les conteneurs, images et volumes."
+        actions={(
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Input
+              type="search"
+              placeholder="Rechercher un conteneur, une image, un volume..."
+              value={searchStr}
+              onChange={(event) => setSearchStr(event.target.value)}
+              className="w-full sm:min-w-[20rem] sm:max-w-[420px]"
+            />
+            <Button variant="secondary" onClick={() => void handleRefresh()}>
+              <IconRefresh />
+            </Button>
+          </div>
+        )}
+      />
 
-        <Form.Control
-          className="rounded-5"
-          type="search"
-          placeholder="Rechercher un container, une image, un volume..."
-          value={searchStr}
-          onChange={(event) => setSearchStr(event.target.value)}
-          style={{ maxWidth: 420 }}
-        />
-        <Button variant="outline-secondary" onClick={() => void liveManager.refreshAll()}>
-          <IconRefresh />
-        </Button>
+      {snapshot.error ? (
+        <Alert tone="danger">
+          Docker n’a pas pu être chargé correctement. {snapshot.error}
+        </Alert>
+      ) : null}
+
+      {refreshError ? <Alert tone="danger">{refreshError}</Alert> : null}
+      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><StatTile label="Conteneurs" value={snapshot.containers.length} meta="Instances suivies" tone="primary" /></div>
+        <div><StatTile label="Images" value={snapshot.images.length} meta="Références disponibles" /></div>
+        <div><StatTile label="Volumes" value={snapshot.volumes.length} meta="Stockage Docker" /></div>
       </div>
 
-      {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
-
-      <div className="d-flex flex-column flex-md-row gap-3">
-        <div className="border rounded p-3 bg-light w-100">
-          <span className="text-secondary">Containers</span>
-          <h3 className="m-0">{snapshot.containers.length}</h3>
+      <div className="grid gap-3 xl:grid-cols-3">
+        <div>
+          <SectionTitle title="Containers" />
+          <div className="flex flex-col gap-3">
+            {displayedContainers.length <= 0 ? (
+              <EmptyState title={snapshot.error ? "Impossible de lister les conteneurs Docker" : "Aucun conteneur ne correspond à cette recherche"} />
+            ) : (
+              displayedContainers.map((container) => (
+                <ContainerCard
+                  key={container.id}
+                  container={container}
+                  image={snapshot.images.find((image) => image.id === container.imageId)}
+                  volume={snapshot.volumes.find((volume) => volume.id === container.volumeId)}
+                  busyAction={busyAction}
+                  onAction={(action, resourceId) => void runContainerAction(action, resourceId)}
+                />
+              ))
+            )}
+          </div>
         </div>
 
-        <div className="border rounded p-3 bg-light w-100">
-          <span className="text-secondary">Images</span>
-          <h3 className="m-0">{snapshot.images.length}</h3>
+        <div>
+          <SectionTitle title="Images" />
+          <div className="flex flex-col gap-3">
+            {displayedImages.length <= 0 ? (
+              <EmptyState title={snapshot.error ? "Impossible de lister les images Docker" : "Aucune image ne correspond à cette recherche"} />
+            ) : (
+              displayedImages.map((image) => (
+                <ImageCard
+                  image={image}
+                  key={image.id}
+                  busyAction={busyAction}
+                  onAction={(action, resourceId) => void runImageAction(action, resourceId)}
+                />
+              ))
+            )}
+          </div>
         </div>
 
-        <div className="border rounded p-3 bg-light w-100">
-          <span className="text-secondary">Volumes</span>
-          <h3 className="m-0">{snapshot.volumes.length}</h3>
+        <div>
+          <SectionTitle title="Volumes" />
+          <div className="flex flex-col gap-3">
+            {displayedVolumes.length <= 0 ? (
+              <EmptyState title={snapshot.error ? "Impossible de lister les volumes Docker" : "Aucun volume ne correspond à cette recherche"} />
+            ) : (
+              displayedVolumes.map((volume) => <VolumeCard volume={volume} key={volume.id} />)
+            )}
+          </div>
         </div>
       </div>
-
-      <div className="d-flex flex-column flex-xl-row align-items-stretch gap-3">
-        <section className="d-flex flex-column w-100 gap-2">
-          <h2>Containers</h2>
-
-          {displayedContainers.length <= 0 ? (
-            <Alert variant="warning">Aucun container ne correspond à cette recherche</Alert>
-          ) : (
-            displayedContainers.map((container) => (
-              <ContainerCard
-                key={container.id}
-                container={container}
-                image={snapshot.images.find((image) => image.id === container.imageId)}
-                volume={snapshot.volumes.find((volume) => volume.id === container.volumeId)}
-                busyAction={busyAction}
-                onAction={(action, resourceId) => void runContainerAction(action, resourceId)}
-              />
-            ))
-          )}
-        </section>
-
-        <section className="d-flex flex-column w-100 gap-2">
-          <h2>Images</h2>
-
-          {displayedImages.length <= 0 ? (
-            <Alert variant="warning">Aucune image ne correspond à cette recherche</Alert>
-          ) : (
-            displayedImages.map((image) => (
-              <ImageCard
-                image={image}
-                key={image.id}
-                busyAction={busyAction}
-                onAction={(action, resourceId) => void runImageAction(action, resourceId)}
-              />
-            ))
-          )}
-        </section>
-
-        <section className="d-flex flex-column w-100 gap-2">
-          <h2>Volumes</h2>
-
-          {displayedVolumes.length <= 0 ? (
-            <Alert variant="warning">Aucun volume ne correspond à cette recherche</Alert>
-          ) : (
-            displayedVolumes.map((volume) => <VolumeCard volume={volume} key={volume.id} />)
-          )}
-        </section>
-      </div>
-    </div>
+    </PageShell>
   )
 }

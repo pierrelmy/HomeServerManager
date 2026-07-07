@@ -10,13 +10,16 @@ Group=homelab
 SupplementaryGroups=docker
 WorkingDirectory=/opt/homeservermanager/backend
 EnvironmentFile=/etc/homeservermanager/backend.env
+Environment=DOCKER_CONFIG=/var/lib/homeservermanager/docker
 ExecStart=/usr/bin/node /opt/homeservermanager/backend/dist/server.js
 Restart=on-failure
 RestartSec=5
-NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
-ProtectSystem=strict
+# Le flux "Ajouter un service" peut exécuter des commandes root arbitraires
+# via `sudo -n /bin/bash -lc ...`. `ProtectSystem=strict` rendrait apt/dpkg
+# et la plupart des installateurs inopérants en lecture seule.
+ProtectSystem=false
 ReadWritePaths=/var/lib/homeservermanager
 
 [Install]

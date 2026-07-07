@@ -1,6 +1,7 @@
 import type {
   AccountProfile,
   AuthSession,
+  CreateServiceInput,
   DockerSnapshot,
   DockerContainer,
   NasSnapshot,
@@ -15,9 +16,14 @@ import type { HomelabRepository } from "./homelabRepository"
 
 async function fetchJson<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl
+  const headers = new Headers(init?.headers ?? {})
+  if (init?.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
   const response = await fetch(`${normalizedBase}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers,
     ...init,
   })
 
@@ -60,6 +66,15 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
         body: JSON.stringify({ currentPassword, nextPassword }),
       })
     },
+    addService: (input: CreateServiceInput) =>
+      fetchJson<ServiceRecord>(baseUrl, "/services", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    refreshServices: () =>
+      fetchJson<ServiceRecord[]>(baseUrl, "/services/refresh", { method: "POST" }),
+    refreshServiceLogs: (id: string) =>
+      fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/logs/refresh`, { method: "POST" }),
     actOnService: (id, action) =>
       fetchJson<ServiceRecord>(baseUrl, `/services/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     actOnContainer: (id, action) =>
@@ -68,5 +83,7 @@ export function createHttpHomelabRepository(baseUrl: string): HomelabRepository 
       fetchJson<DockerSnapshot>(baseUrl, `/docker/images/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
     runNasScrub: () => fetchJson<ToolJob>(baseUrl, "/nas/scrub", { method: "POST" }),
     runTool: (id) => fetchJson<ToolJob>(baseUrl, `/tools/${encodeURIComponent(id)}/run`, { method: "POST" }),
+    clearTerminalSession: (id) =>
+      fetchJson<TerminalSnapshot>(baseUrl, `/terminal/sessions/${encodeURIComponent(id)}/clear`, { method: "POST" }),
   }
 }
