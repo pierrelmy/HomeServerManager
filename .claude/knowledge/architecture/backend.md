@@ -68,6 +68,30 @@ In-memory store backed by SQLite. Sessions are cookie-signed (via `@fastify/cook
 
 Roles: `admin` (full access) and `viewer` (read-only, not yet exposed in UI).
 
+## Rate limiting
+
+Registered globally via `@fastify/rate-limit`. Per-route overrides:
+
+| Scope | Limit |
+|---|---|
+| Global | 100 req/min per IP |
+| `POST /session` | 10 req/min |
+| `POST /terminal/execute` | 10 cmd/min per session (fixed-window, in-process) |
+| Admin action endpoints (start/stop/restart, scrub, etc.) | 5–20 req/min |
+
+`cookie` and `authorization` headers are redacted from all pino log output — session tokens never appear in journal logs.
+
+## Terminal routes
+
+- `POST /terminal/execute` — runs a command in the active session (admin). Broadcast `terminal.line.appended` event via WebSocket.
+- `POST /terminal/sessions/:id/clear` — clears session history (admin). Persisted to SQLite, broadcast `terminal.cleared` event.
+
+## Audit route
+
+`GET /audit` (admin) — returns chronological list of audit entries from SQLite. Every mutation that goes through `audited()` writes a `{action, resource, outcome, userId, timestamp}` record.
+
 ## Config (`src/config.ts`)
 
 Parsed once at startup with Zod. Production mode enforces stricter constraints (see `standards/security.md`). All downstream code receives the typed `AppConfig` — never reads `process.env` directly.
+
+Optional env vars with defaults: `LOG_LEVEL` (default `"info"`), `METRICS_INTERVAL_MS` (default `5000`).
