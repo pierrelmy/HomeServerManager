@@ -61,7 +61,10 @@ function isAllowedOrigin(origin: string | undefined, config: AppConfig): boolean
 
 export async function buildApp(config: AppConfig, dependencies: AppDependencies = {}): Promise<BuiltApp> {
   const app = Fastify({
-    logger: config.nodeEnv === "test" ? false : { level: config.logLevel },
+    logger: config.nodeEnv === "test" ? false : {
+      level: config.logLevel,
+      redact: ["req.headers.cookie", "req.headers.authorization"],
+    },
     requestIdHeader: "x-request-id",
     disableRequestLogging: config.nodeEnv === "test",
   })

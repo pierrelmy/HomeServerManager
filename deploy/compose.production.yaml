@@ -10,6 +10,11 @@ services:
       - /var/run
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
       interval: 30s
@@ -36,6 +41,11 @@ services:
       - caddy-config:/config
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
   prometheus:
     image: prom/prometheus:v3
@@ -54,6 +64,11 @@ services:
       - prometheus-data:/prometheus
     security_opt:
       - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
 volumes:
   caddy-data:
