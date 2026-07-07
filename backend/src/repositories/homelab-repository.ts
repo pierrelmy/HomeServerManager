@@ -22,8 +22,10 @@ export interface HomelabRepository {
   getOverview(): OverviewSnapshot
   setOverview(value: OverviewSnapshot): void
   listServices(): ServiceRecord[]
+  replaceServices(values: ServiceRecord[]): void
   getService(id: string): ServiceRecord | undefined
   saveService(value: ServiceRecord): void
+  removeService(id: string): void
   getDocker(): DockerSnapshot
   saveDocker(value: DockerSnapshot): void
   getNas(): NasSnapshot
@@ -32,6 +34,7 @@ export interface HomelabRepository {
   saveTools(value: ToolsSnapshot): void
   getTerminal(): TerminalSnapshot
   appendTerminalLine(sessionId: string, line: TerminalLine): void
+  clearTerminalSession(sessionId: string): void
   getAccount(): AccountProfile
   getSettings(ownerId: string): SettingsState
   saveSettings(ownerId: string, value: SettingsState): void
@@ -68,11 +71,16 @@ export class SqliteHomelabRepository implements HomelabRepository {
   getOverview() { return this.getSnapshot<OverviewSnapshot>("overview") }
   setOverview(value: OverviewSnapshot) { this.setSnapshot("overview", value) }
   listServices() { return this.getSnapshot<ServiceRecord[]>("services") }
+  replaceServices(values: ServiceRecord[]) { this.setSnapshot("services", values) }
   getService(id: string) { return this.listServices().find((service) => service.id === id) }
   saveService(value: ServiceRecord) {
     const services = this.listServices()
     const index = services.findIndex((service) => service.id === value.id)
     if (index < 0) services.unshift(clone(value)); else services[index] = clone(value)
+    this.setSnapshot("services", services)
+  }
+  removeService(id: string) {
+    const services = this.listServices().filter((service) => service.id !== id)
     this.setSnapshot("services", services)
   }
   getDocker() { return this.getSnapshot<DockerSnapshot>("docker") }
@@ -87,6 +95,13 @@ export class SqliteHomelabRepository implements HomelabRepository {
     const session = terminal.sessions.find((item) => item.id === sessionId)
     if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
     session.lines = [...session.lines, clone(line)].slice(-100)
+    this.setSnapshot("terminal", terminal)
+  }
+  clearTerminalSession(sessionId: string) {
+    const terminal = this.getTerminal()
+    const session = terminal.sessions.find((item) => item.id === sessionId)
+    if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
+    session.lines = []
     this.setSnapshot("terminal", terminal)
   }
   getAccount() { return this.getSnapshot<AccountProfile>("account") }
@@ -185,10 +200,14 @@ export class InMemoryHomelabRepository implements HomelabRepository {
   getOverview() { return clone(this.overview) }
   setOverview(value: OverviewSnapshot) { this.overview = clone(value) }
   listServices() { return clone(this.services) }
+  replaceServices(values: ServiceRecord[]) { this.services = clone(values) }
   getService(id: string) { const value = this.services.find((service) => service.id === id); return value ? clone(value) : undefined }
   saveService(value: ServiceRecord) {
     const index = this.services.findIndex((service) => service.id === value.id)
     if (index < 0) this.services.unshift(clone(value)); else this.services[index] = clone(value)
+  }
+  removeService(id: string) {
+    this.services = this.services.filter((service) => service.id !== id)
   }
   getDocker() { return clone(this.docker) }
   saveDocker(value: DockerSnapshot) { this.docker = clone(value) }
@@ -201,6 +220,11 @@ export class InMemoryHomelabRepository implements HomelabRepository {
     const session = this.terminal.sessions.find((item) => item.id === sessionId)
     if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
     session.lines = [...session.lines, clone(line)].slice(-100)
+  }
+  clearTerminalSession(sessionId: string) {
+    const session = this.terminal.sessions.find((item) => item.id === sessionId)
+    if (!session) throw new Error(`Unknown terminal session: ${sessionId}`)
+    session.lines = []
   }
   getAccount() { return clone(accountSeed) }
   getSettings(ownerId: string) { return clone(this.settings.get(ownerId) ?? settingsSeed) }

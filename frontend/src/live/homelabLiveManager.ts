@@ -1,6 +1,7 @@
 import type {
   AccountProfile,
   AuthSession,
+  CreateServiceInput,
   DockerSnapshot,
   NasSnapshot,
   OverviewSnapshot,
@@ -49,12 +50,17 @@ export interface HomelabLiveManager {
   signOut(): Promise<AuthSession>
   updateSettings(patch: Partial<SettingsState>): Promise<SettingsState>
   changePassword(currentPassword: string, nextPassword: string): Promise<void>
+  addService(input: CreateServiceInput): Promise<ServiceRecord>
+  refreshServices(): Promise<ServiceRecord[]>
+  refreshServiceLogs(id: string): Promise<ServiceRecord>
   actOnService(id: string, action: "start" | "stop" | "restart"): Promise<ServiceRecord>
   actOnContainer(id: string, action: "start" | "stop" | "restart"): Promise<void>
   actOnImage(id: string, action: "pull" | "run"): Promise<void>
   runNasScrub(): Promise<void>
   runTool(id: string): Promise<void>
+  refreshTools(): Promise<void>
   executeTerminalCommand(command: string): void
+  clearTerminalSession(sessionId?: string): Promise<void>
   requestRefresh(scope: keyof HomelabLiveBundle | "all"): void
 }
 
@@ -410,6 +416,9 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
       const nextSession = await repository.signIn(email, password)
       session.setState(nextSession)
       await loadAll()
+      if (!session.getSnapshot()?.isAuthenticated) {
+        throw new Error("La session n'a pas pu être persistée dans le navigateur. En développement local, utilisez la même origine pour le frontend et l'API, par exemple 127.0.0.1 des deux côtés.")
+      }
       reconnectRealtime()
       return nextSession
     },
@@ -437,6 +446,22 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
     async changePassword(currentPassword, nextPassword) {
       await repository.changePassword(currentPassword, nextPassword)
     },
+    async addService(input) {
+      const nextService = await repository.addService(input)
+      services.update((current) => upsertById(current ?? [], nextService))
+      return nextService
+    },
+    async refreshServices() {
+      const nextServices = await repository.refreshServices()
+      services.setState(nextServices)
+      setReady({ lastSyncedAt: new Date().toISOString(), error: null })
+      return nextServices
+    },
+    async refreshServiceLogs(id) {
+      const nextService = await repository.refreshServiceLogs(id)
+      services.update((current) => upsertById(current ?? [], nextService))
+      return nextService
+    },
     async actOnService(id, action) {
       const nextService = await repository.actOnService(id, action)
       services.update((current) => upsertById(current ?? [], nextService))
@@ -460,6 +485,9 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
       await repository.runTool(id)
       tools.setState(await repository.getToolsSnapshot())
     },
+    async refreshTools() {
+      tools.setState(await repository.getToolsSnapshot())
+    },
     executeTerminalCommand(command: string) {
       if (transport.mode === "websocket") {
         const commandPayload: HomelabRealtimeCommand = { type: "terminal.execute", command }
@@ -475,6 +503,14 @@ export function createHomelabLiveManager(repository: HomelabRepository, transpor
         sessionId: nextSessionId,
         line: nextLine,
       })
+    },
+    async clearTerminalSession(sessionId) {
+      const current = terminal.getSnapshot()
+      const targetSessionId = sessionId ?? current?.activeSessionId
+      if (!targetSessionId) return
+
+      const nextTerminal = await repository.clearTerminalSession(targetSessionId)
+      terminal.setState(nextTerminal)
     },
     requestRefresh(scope: keyof HomelabLiveBundle | "all") {
       const payload: HomelabRealtimeCommand = { type: "refresh.request", scope }

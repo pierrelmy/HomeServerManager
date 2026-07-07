@@ -1,0 +1,11 @@
+[Unit]
+Description=HomeServerManager SQLite daily backup
+Requires=backup-sqlite.service
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+Unit=backup-sqlite.service
+
+[Install]
+WantedBy=timers.target

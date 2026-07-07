@@ -1,0 +1,26 @@
+[Unit]
+Description=HomeServerManager backend (dev VM)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=homelab
+Group=homelab
+SupplementaryGroups=docker
+WorkingDirectory=/srv/homeservermanager-dev/backend
+EnvironmentFile=/srv/homeservermanager-dev/backend/.env
+Environment=DOCKER_CONFIG=/var/lib/homeservermanager/docker
+ExecStart=/usr/bin/node /srv/homeservermanager-dev/backend/dist/server.js
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+ProtectHome=true
+# Le flux "Ajouter un service" peut exécuter des commandes root arbitraires
+# via `sudo -n /bin/bash -lc ...`. `ProtectSystem=strict` rendrait apt/dpkg
+# et la plupart des installateurs inopérants en lecture seule.
+ProtectSystem=false
+ReadWritePaths=/var/lib/homeservermanager
+
+[Install]
+WantedBy=multi-user.target

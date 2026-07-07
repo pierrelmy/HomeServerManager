@@ -60,6 +60,40 @@ describe("homelab API", () => {
     }
   })
 
+  it("derives services and tools from local system configuration", async () => {
+    built = await buildApp({
+      ...config,
+      systemAdapter: "local",
+      systemServiceMap: '{"demo-service":"homelab-demo.service","docker-engine":"docker.service"}',
+      nasScrubCommand: '["/usr/bin/true"]',
+      nasStatusCommand: '["/usr/bin/printf","{\\"capacityUsed\\":\\"20 Go / 100 Go\\",\\"healthSummary\\":\\"OK\\",\\"backupSummary\\":\\"N/A\\",\\"temperatureSummary\\":\\"N/A\\",\\"pools\\":[],\\"backups\\":[],\\"drives\\":[]}"]',
+      toolCommands: '{"scan-reseau":["/usr/bin/true"]}',
+    })
+
+    const servicesResponse = await built.app.inject({ method: "GET", url: "/services" })
+    expect(servicesResponse.statusCode).toBe(200)
+    expect(servicesResponse.json()).toEqual([
+      expect.objectContaining({ id: "demo-service", label: "Demo Service", location: "homelab-demo.service", unit: "homelab-demo.service", servicePath: null }),
+      expect.objectContaining({ id: "docker-engine", label: "Docker Engine", location: "docker.service", unit: "docker.service", servicePath: null }),
+    ])
+
+    const toolsResponse = await built.app.inject({ method: "GET", url: "/tools" })
+    expect(toolsResponse.statusCode).toBe(200)
+    expect(toolsResponse.json()).toMatchObject({
+      tools: [
+        {
+          id: "scan-reseau",
+          title: "Scan réseau",
+          description: "Détecte les hôtes visibles et regroupe les ports courants.",
+          tag: "Réseau",
+        },
+      ],
+      updateStatus: {
+        status: "idle",
+      },
+    })
+  })
+
   it("creates and removes a signed session", async () => {
     const instance = await setup()
     const cookie = await login(instance)
@@ -68,6 +102,57 @@ describe("homelab API", () => {
 
     const logout = await instance.app.inject({ method: "DELETE", url: "/session", headers: { cookie } })
     expect(logout.json()).toEqual({ isAuthenticated: false, provider: null, displayName: null, email: null, role: null })
+  })
+
+  it("accepts alternate frontend origins in development mode", async () => {
+    const instance = await setup()
+    const response = await instance.app.inject({
+      method: "OPTIONS",
+      url: "/session",
+      headers: {
+        origin: "http://host-001.lan:5173",
+        "access-control-request-method": "POST",
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers["access-control-allow-origin"]).toBe("http://host-001.lan:5173")
+  })
+
+  it("allows PATCH preflight requests for settings", async () => {
+    const instance = await setup()
+    const response = await instance.app.inject({
+      method: "OPTIONS",
+      url: "/settings",
+      headers: {
+        origin: "http://192.168.64.6:4173",
+        "access-control-request-method": "PATCH",
+      },
+    })
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers["access-control-allow-origin"]).toBe("http://192.168.64.6:4173")
+    expect(String(response.headers["access-control-allow-methods"] ?? "")).toContain("PATCH")
+  })
+
+  it("keeps origin checks strict in production", async () => {
+    built = await buildApp({
+      ...config,
+      nodeEnv: "production",
+      corsOrigins: ["https://homelab.example.test"],
+    })
+
+    const response = await built.app.inject({
+      method: "OPTIONS",
+      url: "/session",
+      headers: {
+        origin: "http://host-001.lan:5173",
+        "access-control-request-method": "POST",
+      },
+    })
+
+    expect(response.statusCode).toBe(404)
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined()
   })
 
   it("protects mutations and validates settings", async () => {
@@ -86,31 +171,85 @@ describe("homelab API", () => {
 
   it("runs service actions and records an audit entry", async () => {
     const instance = await setup()
+    instance.repository.saveService({
+      id: "demo-service",
+      label: "Demo Service",
+      desc: "Service de test",
+      location: "homelab-demo.service",
+      unit: "homelab-demo.service",
+      servicePath: null,
+      webUrl: null,
+      status: "stopped",
+      logs: [],
+    })
     const cookie = await login(instance)
-    const response = await instance.app.inject({ method: "POST", url: "/services/jenkins/start", headers: { cookie } })
+    const response = await instance.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toMatchObject({ id: "jenkins", status: "running" })
+    expect(response.json()).toMatchObject({ id: "demo-service", status: "running" })
 
-    const conflict = await instance.app.inject({ method: "POST", url: "/services/jenkins/start", headers: { cookie } })
+    const conflict = await instance.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
     expect(conflict.statusCode).toBe(409)
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
-    expect(audit.json()).toEqual(expect.arrayContaining([expect.objectContaining({ action: "service.start", resource: "jenkins" })]))
+    expect(audit.json()).toEqual(expect.arrayContaining([expect.objectContaining({ action: "service.start", resource: "demo-service" })]))
   })
 
-  it("only executes allowlisted terminal commands", async () => {
+  it("adds a service and persists its metadata", async () => {
     const instance = await setup()
     const cookie = await login(instance)
-    const rejected = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "rm -rf /" } })
-    expect(rejected.statusCode).toBe(409)
+    const response = await instance.app.inject({
+      method: "POST",
+      url: "/services",
+      headers: { cookie },
+      payload: {
+        label: "Ollama",
+        description: "LLM local",
+        serviceUnit: "ollama.service",
+        servicePath: "/etc/systemd/system/ollama.service",
+        startAfterInstall: false,
+      },
+    })
 
-    const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "uptime" } })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({
+      id: "ollama",
+      label: "Ollama",
+      desc: "LLM local",
+      unit: "ollama.service",
+      servicePath: "/etc/systemd/system/ollama.service",
+      status: "stopped",
+    })
+
+    const services = await instance.app.inject({ method: "GET", url: "/services" })
+    expect(services.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "ollama",
+        unit: "ollama.service",
+        servicePath: "/etc/systemd/system/ollama.service",
+      }),
+    ]))
+  })
+
+  it("executes terminal commands and records them", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+    const accepted = await instance.app.inject({ method: "POST", url: "/terminal/execute", headers: { cookie }, payload: { command: "printf 'hello'" } })
     expect(accepted.statusCode, accepted.body).toBe(201)
-    expect(accepted.json()).toMatchObject({ sessionId: "local-shell", line: { command: "uptime", status: "ok" } })
+    expect(accepted.json()).toMatchObject({
+      sessionId: "terminal",
+      line: {
+        command: "printf 'hello'",
+        status: "warning",
+        output: [
+          "Simulation: printf 'hello'",
+          "Aucune commande réelle n'est exécutée dans cet environnement.",
+        ],
+      },
+    })
 
     const audit = await instance.app.inject({ method: "GET", url: "/audit", headers: { cookie } })
     expect(audit.json()).toEqual(expect.arrayContaining([
-      expect.objectContaining({ action: "terminal.execute", resource: "rm -rf /", outcome: "failure" }),
+      expect.objectContaining({ action: "terminal.execute", resource: "printf 'hello'", outcome: "success" }),
     ]))
   })
 
@@ -135,6 +274,77 @@ describe("homelab API", () => {
       payload: { command: "uptime" },
     })
     expect(limited.statusCode).toBe(429)
+  })
+
+  it("clears a terminal session persistently", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+
+    const executed = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/execute",
+      headers: { cookie },
+      payload: { command: "printf 'hello'" },
+    })
+    expect(executed.statusCode).toBe(201)
+
+    const cleared = await instance.app.inject({
+      method: "POST",
+      url: "/terminal/sessions/terminal/clear",
+      headers: { cookie },
+    })
+    expect(cleared.statusCode, cleared.body).toBe(200)
+    expect(cleared.json()).toMatchObject({
+      activeSessionId: "terminal",
+      sessions: [
+        expect.objectContaining({
+          id: "terminal",
+          lines: [],
+        }),
+      ],
+    })
+
+    const terminal = await instance.app.inject({
+      method: "GET",
+      url: "/terminal",
+      headers: { cookie },
+    })
+    expect(terminal.statusCode).toBe(200)
+    expect(terminal.json()).toMatchObject({
+      activeSessionId: "terminal",
+      sessions: [
+        expect.objectContaining({
+          id: "terminal",
+          lines: [],
+        }),
+      ],
+    })
+  })
+
+  it("returns a client error when a local service command fails", async () => {
+    built = await buildApp({
+      ...config,
+      systemAdapter: "local",
+      systemServiceMap: '{"demo-service":"homelab-demo.service"}',
+      nasScrubCommand: '["/usr/bin/true"]',
+      nasStatusCommand: '["/usr/bin/printf","{\\"capacityUsed\\":\\"20 Go / 100 Go\\",\\"healthSummary\\":\\"OK\\",\\"backupSummary\\":\\"N/A\\",\\"temperatureSummary\\":\\"N/A\\",\\"pools\\":[],\\"backups\\":[],\\"drives\\":[]}"]',
+      toolCommands: '{}',
+    })
+    built.repository.saveService({
+      id: "demo-service",
+      label: "Demo Service",
+      desc: "Service de test",
+      location: "homelab-demo.service",
+      unit: "homelab-demo.service",
+      servicePath: null,
+      webUrl: null,
+      status: "stopped",
+      logs: [],
+    })
+    const cookie = await login(built)
+    const response = await built.app.inject({ method: "POST", url: "/services/demo-service/start", headers: { cookie } })
+    expect(response.statusCode).toBe(400)
+    expect(response.json()).toMatchObject({ error: "BAD_REQUEST" })
   })
 
   it("protects and exposes Prometheus metrics", async () => {

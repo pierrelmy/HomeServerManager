@@ -3,13 +3,28 @@ import {
   IconPlayerStop,
   IconPlayerPlay,
   IconAlertHexagon,
+  IconPlus,
+  IconBrandDocker,
+  IconBox,
+  IconCpu,
+  IconDatabase,
+  IconServer,
+  IconShieldCheck,
+  IconBrandGithub,
+  IconNetwork,
+  IconCloudLock,
+  IconArchive,
+  IconMessageCircle,
+  IconWorldWww,
   type IconProps,
   IconLogs,
+  IconExternalLink,
 } from "@tabler/icons-react"
-import { useMemo, useState } from "react"
-import { Alert, Button, Offcanvas } from "react-bootstrap"
-import type { LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import type { CreateServiceInput, LogVerbosity, ServiceRecord, ServiceStatus } from "../domain/homelab"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabServices } from "../live/useHomelabLive"
+import { Alert, Button, EmptyState, Input, PageHeader, PageShell, SectionTitle, Spinner, StatTile, StatusBadge, Surface, Textarea } from "../components/ui"
 
 interface ServiceAction {
   id: "start" | "stop" | "restart" | "see-logs"
@@ -18,6 +33,140 @@ interface ServiceAction {
   availableWhile: ServiceStatus[]
   variant: string
 }
+
+interface KnownServiceTemplate {
+  id: string
+  label: string
+  description: string
+  serviceUnit: string
+  servicePath?: string
+  installCommand?: string
+  webUrl?: string
+  icon: React.ForwardRefExoticComponent<IconProps & React.RefAttributes<SVGSVGElement>>
+}
+
+const knownServices: KnownServiceTemplate[] = [
+  {
+    id: "ollama",
+    label: "Ollama",
+    description: "Service LLM local",
+    serviceUnit: "ollama.service",
+    servicePath: "/etc/systemd/system/ollama.service",
+    installCommand: "curl -fsSL https://ollama.com/install.sh | sh\nsystemctl enable ollama\nsystemctl start ollama",
+    webUrl: "http://127.0.0.1:11434",
+    icon: IconCpu,
+  },
+  {
+    id: "docker",
+    label: "Docker Engine",
+    description: "Moteur de conteneurs",
+    serviceUnit: "docker.service",
+    servicePath: "/lib/systemd/system/docker.service",
+    icon: IconBrandDocker,
+  },
+  {
+    id: "jenkins",
+    label: "Jenkins",
+    description: "Intégration continue",
+    serviceUnit: "jenkins.service",
+    servicePath: "/lib/systemd/system/jenkins.service",
+    installCommand: "export DEBIAN_FRONTEND=noninteractive\napt-get update\napt-get install -y fontconfig wget curl gpg ca-certificates\nif apt-cache show openjdk-21-jre >/dev/null 2>&1; then\n  apt-get install -y openjdk-21-jre\nelse\n  install -d -m 0755 /etc/apt/keyrings\n  wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg\n  . /etc/os-release\n  echo \"deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb ${VERSION_CODENAME} main\" | tee /etc/apt/sources.list.d/adoptium.list >/dev/null\n  apt-get update\n  apt-get install -y temurin-21-jre\nfi\ninstall -d -m 0755 /etc/apt/keyrings\nwget -O /etc/apt/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key\necho 'deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/' | tee /etc/apt/sources.list.d/jenkins.list >/dev/null\napt-get update\napt-get install -y jenkins\nsystemctl enable jenkins\nsystemctl start jenkins",
+    webUrl: "http://127.0.0.1:8080",
+    icon: IconBox,
+  },
+  {
+    id: "postgresql",
+    label: "PostgreSQL",
+    description: "Base de données locale",
+    serviceUnit: "postgresql.service",
+    servicePath: "/lib/systemd/system/postgresql.service",
+    installCommand: "apt-get update\napt-get install -y postgresql\nsystemctl enable postgresql\nsystemctl start postgresql",
+    icon: IconDatabase,
+  },
+  {
+    id: "caddy",
+    label: "Caddy",
+    description: "Reverse proxy",
+    serviceUnit: "caddy.service",
+    servicePath: "/lib/systemd/system/caddy.service",
+    installCommand: "apt-get update\napt-get install -y debian-keyring debian-archive-keyring apt-transport-https\ncurl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg\ncurl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list\napt-get update\napt-get install -y caddy\nsystemctl enable caddy\nsystemctl start caddy",
+    webUrl: "http://127.0.0.1",
+    icon: IconServer,
+  },
+  {
+    id: "tailscale",
+    label: "Tailscale",
+    description: "Réseau privé mesh",
+    serviceUnit: "tailscaled.service",
+    servicePath: "/lib/systemd/system/tailscaled.service",
+    installCommand: "curl -fsSL https://tailscale.com/install.sh | sh\nsystemctl enable tailscaled\nsystemctl start tailscaled",
+    icon: IconShieldCheck,
+  },
+  {
+    id: "github-runner",
+    label: "GitHub Runner",
+    description: "Runner self-hosted GitHub Actions",
+    serviceUnit: "actions.runner.service",
+    servicePath: "/etc/systemd/system/actions.runner.service",
+    icon: IconBrandGithub,
+  },
+  {
+    id: "nginx",
+    label: "Nginx",
+    description: "Serveur web et reverse proxy",
+    serviceUnit: "nginx.service",
+    servicePath: "/lib/systemd/system/nginx.service",
+    installCommand: "apt-get update\napt-get install -y nginx\nsystemctl enable nginx\nsystemctl start nginx",
+    webUrl: "http://127.0.0.1",
+    icon: IconWorldWww,
+  },
+  {
+    id: "fail2ban",
+    label: "Fail2ban",
+    description: "Protection contre les tentatives d'intrusion",
+    serviceUnit: "fail2ban.service",
+    servicePath: "/lib/systemd/system/fail2ban.service",
+    installCommand: "apt-get update\napt-get install -y fail2ban\nsystemctl enable fail2ban\nsystemctl start fail2ban",
+    icon: IconCloudLock,
+  },
+  {
+    id: "netdata",
+    label: "Netdata",
+    description: "Supervision système temps réel",
+    serviceUnit: "netdata.service",
+    servicePath: "/lib/systemd/system/netdata.service",
+    installCommand: "apt-get update\napt-get install -y netdata\nsystemctl enable netdata\nsystemctl start netdata",
+    webUrl: "http://127.0.0.1:19999",
+    icon: IconNetwork,
+  },
+  {
+    id: "duplicati",
+    label: "Duplicati",
+    description: "Sauvegarde chiffrée et planifiée",
+    serviceUnit: "duplicati.service",
+    servicePath: "/etc/systemd/system/duplicati.service",
+    webUrl: "http://127.0.0.1:8200",
+    icon: IconArchive,
+  },
+  {
+    id: "mosquitto",
+    label: "Mosquitto",
+    description: "Broker MQTT léger",
+    serviceUnit: "mosquitto.service",
+    servicePath: "/lib/systemd/system/mosquitto.service",
+    installCommand: "apt-get update\napt-get install -y mosquitto mosquitto-clients\nsystemctl enable mosquitto\nsystemctl start mosquitto",
+    icon: IconMessageCircle,
+  },
+  {
+    id: "plex",
+    label: "Plex Media Server",
+    description: "Serveur multimédia",
+    serviceUnit: "plexmediaserver.service",
+    servicePath: "/lib/systemd/system/plexmediaserver.service",
+    webUrl: "http://127.0.0.1:32400/web",
+    icon: IconPlayerPlay,
+  },
+]
 
 function getServiceActions(status: ServiceStatus): ServiceAction[] {
   const actions: ServiceAction[] = [
@@ -30,9 +179,30 @@ function getServiceActions(status: ServiceStatus): ServiceAction[] {
   return actions.filter((action) => action.availableWhile.includes(status))
 }
 
+function stopClickPropagation(event: React.MouseEvent | React.KeyboardEvent): void {
+  event.stopPropagation()
+}
+
 function capitalize(value: string): string {
   const trimmed = value.trim()
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+}
+
+function predictServiceId(label: string, unit: string): string {
+  const value = (label.trim() || unit.replace(/\.service$/i, "").trim())
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+}
+
+function emptyDraft(): CreateServiceInput {
+  return {
+    label: "",
+    description: "",
+    serviceUnit: "",
+    servicePath: "",
+    installCommand: "",
+    webUrl: "",
+    startAfterInstall: false,
+  }
 }
 
 function ServiceCard({
@@ -40,46 +210,82 @@ function ServiceCard({
   onOpenLogs,
   onAction,
   busyAction,
+  onOpenWeb,
 }: {
   service: ServiceRecord
   onOpenLogs: (serviceId: string) => void
   onAction: (serviceId: string, action: "start" | "stop" | "restart") => void
   busyAction: string | null
+  onOpenWeb: (serviceId: string) => void
 }) {
+  const statusTone =
+    service.status === "starting" || service.status === "stopping"
+      ? "warning"
+      : service.status === "running"
+        ? "success"
+        : service.status === "stopped"
+          ? "neutral"
+          : "danger"
+
   return (
-    <div className="d-flex flex-column border rounded p-3 bg-light">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-2">
-        <span className="fs-3">{service.label}</span>
-        <div className="d-flex flex-row justify-content-center align-items-center gap-2">
-          <span
-            className={`rounded-circle border border-1 bg-${
-              service.status === "starting" || service.status === "stopping"
-                ? "warning"
-                : service.status === "running"
-                  ? "success"
-                  : service.status === "stopped"
-                    ? "body-secondary"
-                    : "danger"
-            } d-inline-block`}
-            style={{ width: 15, height: 15 }}
-          />
-          <span className="fs-5 fw-medium">{capitalize(service.status)}</span>
+    <div
+      className={`service-card flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition dark:border-slate-800 dark:bg-slate-900 ${service.webUrl ? "service-card--interactive cursor-pointer hover:border-sky-300 hover:shadow-md dark:hover:border-sky-700" : ""}`}
+      role={service.webUrl ? "button" : undefined}
+      tabIndex={service.webUrl ? 0 : undefined}
+      onClick={() => {
+        if (service.webUrl) onOpenWeb(service.id)
+      }}
+      onKeyDown={(event) => {
+        if (service.webUrl && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault()
+          onOpenWeb(service.id)
+        }
+      }}
+    >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xl font-semibold text-slate-950 dark:text-slate-50">{service.label}</span>
+            <StatusBadge tone={statusTone}>{capitalize(service.status)}</StatusBadge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{service.desc}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 lg:min-w-[15rem]">
+          <div className="truncate font-medium text-slate-700 dark:text-slate-200">{service.unit}</div>
+          <div className="mt-1 break-all text-xs">{service.servicePath ?? service.location}</div>
+          {service.webUrl ? (
+            <div className="mt-2 inline-flex">
+              <StatusBadge tone="primary">
+                <IconExternalLink size={14} />
+                <span>Interface web</span>
+              </StatusBadge>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="d-flex flex-column flex-lg-row justify-content-between gap-2">
-        <span className="text-secondary">{service.desc}</span>
-        <span className="text-secondary">{service.location}</span>
-      </div>
-
-      <div className="d-flex flex-wrap justify-content-start gap-2 mt-2">
+      <div className="flex flex-col gap-2 border-t border-slate-200 pt-4 dark:border-slate-800 sm:flex-row sm:flex-wrap">
+        {service.webUrl ? (
+          <Button
+            className="flex w-full items-center gap-1 sm:w-auto"
+            variant="secondary"
+            onClick={(event) => {
+              stopClickPropagation(event)
+              onOpenWeb(service.id)
+            }}
+          >
+            <IconExternalLink size={18} />
+            <span>Ouvrir l’UI</span>
+          </Button>
+        ) : null}
         {getServiceActions(service.status).map((action) => (
           <Button
             key={action.id}
-            className="d-flex flex-row justify-content-center align-items-center gap-1"
-            variant={action.variant}
+            className="flex w-full items-center gap-1 sm:w-auto"
+            variant={action.variant === "danger" ? "danger" : action.variant === "primary" ? "primary" : "secondary"}
             disabled={busyAction === `${service.id}:${action.id}`}
-            onClick={() => {
+            onClick={(event) => {
+              stopClickPropagation(event)
               if (action.id === "see-logs") {
                 onOpenLogs(service.id)
               } else {
@@ -96,6 +302,54 @@ function ServiceCard({
   )
 }
 
+function KnownServiceCard({
+  service,
+  disabled = false,
+  onSelect,
+}: {
+  service: KnownServiceTemplate
+  disabled?: boolean
+  onSelect: (service: KnownServiceTemplate) => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`catalog-card h-full rounded-3xl border p-5 text-left shadow-sm transition ${
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 opacity-70 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500"
+          : "border-slate-200 bg-white hover:border-sky-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-700"
+      }`}
+      onClick={() => {
+        if (!disabled) onSelect(service)
+      }}
+      disabled={disabled}
+      aria-disabled={disabled}
+    >
+      <div className="mb-3 flex items-center gap-3">
+        <div className={`rounded-2xl border p-3 ${disabled ? "border-slate-200 bg-slate-200 dark:border-slate-700 dark:bg-slate-800" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800"}`}>
+          <service.icon size={22} className={disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-600 dark:text-slate-300"} />
+        </div>
+        <div className="min-w-0">
+          <div className={`text-lg font-semibold ${disabled ? "text-slate-500 dark:text-slate-400" : "text-slate-950 dark:text-slate-50"}`}>{service.label}</div>
+          <div className={`text-sm ${disabled ? "text-slate-400 dark:text-slate-500" : "text-slate-500 dark:text-slate-400"}`}>{service.serviceUnit}</div>
+        </div>
+      </div>
+      <div className={`mb-4 text-sm leading-6 ${disabled ? "text-slate-500 dark:text-slate-400" : "text-slate-600 dark:text-slate-300"}`}>{service.description}</div>
+      <div className={`rounded-2xl px-3 py-2 text-sm ${
+        disabled
+          ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+          : "bg-slate-50 text-slate-500 dark:bg-slate-800/70 dark:text-slate-400"
+      }`}>
+        {disabled
+          ? "Déjà installé"
+          : service.installCommand
+            ? "Préremplit l’installation et le mode déjà installé."
+            : "Préremplit le mode service déjà installé."}
+      </div>
+    </button>
+  )
+}
+
 function LogLine({
   timestamp,
   verbosity,
@@ -105,23 +359,26 @@ function LogLine({
   verbosity: LogVerbosity
   content: string
 }) {
-  let contentClass = "fs-5"
+  let contentClass = "text-sm"
 
   switch (verbosity) {
     case "debug":
-      contentClass += " text-secondary fw-light"
+      contentClass += " text-slate-500 dark:text-slate-400"
       break
     case "warning":
-      contentClass += " text-warning fw-semibold"
+      contentClass += " font-semibold text-amber-500"
       break
     case "error":
-      contentClass += " text-danger fw-bold"
+      contentClass += " font-semibold text-rose-500"
+      break
+    default:
+      contentClass += " text-slate-800 dark:text-slate-100"
       break
   }
 
   return (
-    <div className="d-flex flex-row gap-2">
-      <span className="text-secondary fs-5">{timestamp}</span>
+    <div className="flex gap-2">
+      <span className="font-mono text-sm text-slate-500 dark:text-slate-400">{timestamp}</span>
       <span className={contentClass}>{content}</span>
     </div>
   )
@@ -131,11 +388,20 @@ export default function Services() {
   const liveManager = useHomelabLiveManager()
   const liveState = useHomelabLiveState()
   const services = useHomelabServices()
+  const navigate = useNavigate()
   const [searchStr, setSearchStr] = useState("")
   const [displayedLogsServiceId, setDisplayedLogsServiceId] = useState("")
   const [statusFilters, setStatusFilters] = useState<ServiceStatus[]>([])
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [refreshingServices, setRefreshingServices] = useState(false)
+  const [refreshingLogsFor, setRefreshingLogsFor] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createMode, setCreateMode] = useState<"catalog" | "installed" | "install">("catalog")
+  const [createDraft, setCreateDraft] = useState<CreateServiceInput>(emptyDraft)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [creatingServiceId, setCreatingServiceId] = useState<string | null>(null)
+  const [createProgressLogs, setCreateProgressLogs] = useState<Array<{ timestamp: string; verbosity: LogVerbosity; content: string }>>([])
 
   const handleAction = async (serviceId: string, action: "start" | "stop" | "restart") => {
     if (action !== "start" && !window.confirm(`Confirmer l’action « ${action} » sur le service ${serviceId} ?`)) return
@@ -148,6 +414,31 @@ export default function Services() {
       setActionError(error instanceof Error ? error.message : "L’action sur le service a échoué")
     } finally {
       setBusyAction(null)
+    }
+  }
+
+  const handleRefreshServices = async () => {
+    setRefreshingServices(true)
+    setActionError(null)
+    try {
+      await liveManager.refreshServices()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Le rafraîchissement des services a échoué")
+    } finally {
+      setRefreshingServices(false)
+    }
+  }
+
+  const handleOpenLogs = async (serviceId: string) => {
+    setDisplayedLogsServiceId(serviceId)
+    setRefreshingLogsFor(serviceId)
+    setActionError(null)
+    try {
+      await liveManager.refreshServiceLogs(serviceId)
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Le chargement des logs a échoué")
+    } finally {
+      setRefreshingLogsFor(null)
     }
   }
 
@@ -175,111 +466,427 @@ export default function Services() {
     return services?.find((service) => service.id === displayedLogsServiceId)?.logs ?? []
   }, [displayedLogsServiceId, services])
 
+  const installedKnownServiceKeys = useMemo(() => {
+    return new Set(
+      (services ?? []).flatMap((service) => {
+        const keys = [
+          service.id.trim().toLowerCase(),
+          service.unit.trim().toLowerCase(),
+        ]
+
+        if (service.servicePath) {
+          keys.push(service.servicePath.trim().toLowerCase())
+        }
+
+        return keys.filter((key) => key !== "")
+      }),
+    )
+  }, [services])
+
+  useEffect(() => {
+    if (!creatingServiceId) return
+    const currentLogs = services?.find((service) => service.id === creatingServiceId)?.logs
+    if (currentLogs && currentLogs.length > 0) {
+      window.setTimeout(() => setCreateProgressLogs(currentLogs), 0)
+    }
+  }, [creatingServiceId, services])
+
+  const canCreateService =
+    createMode !== "catalog"
+    && createDraft.label.trim() !== ""
+    && createDraft.serviceUnit.trim() !== ""
+    && (createMode === "installed" ? Boolean(createDraft.servicePath?.trim()) : Boolean(createDraft.installCommand?.trim()))
+
+  const applyKnownService = (service: KnownServiceTemplate) => {
+    setCreateError(null)
+    setCreateDraft({
+      label: service.label,
+      description: service.description,
+      serviceUnit: service.serviceUnit,
+      servicePath: service.servicePath ?? "",
+      installCommand: service.installCommand ?? "",
+      webUrl: service.webUrl ?? "",
+      startAfterInstall: false,
+    })
+    setCreateMode(service.installCommand ? "install" : "installed")
+  }
+
+  const handleCreateService = async () => {
+    const nextId = predictServiceId(createDraft.label, createDraft.serviceUnit)
+    setCreateError(null)
+    setCreatingServiceId(nextId)
+    setDisplayedLogsServiceId(nextId)
+    setCreateProgressLogs([])
+    try {
+      await liveManager.addService({
+        label: createDraft.label.trim(),
+        description: createDraft.description?.trim() || undefined,
+        serviceUnit: createDraft.serviceUnit.trim(),
+        servicePath: createMode === "installed" ? createDraft.servicePath?.trim() || undefined : undefined,
+        installCommand: createMode === "install" ? createDraft.installCommand?.trim() || undefined : undefined,
+        webUrl: createDraft.webUrl?.trim() || undefined,
+        startAfterInstall: createDraft.startAfterInstall,
+      })
+      setShowCreateModal(false)
+      setCreateMode("installed")
+      setCreateDraft(emptyDraft())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossible d'ajouter le service"
+      setCreateError(message)
+      setCreateProgressLogs((current) => [
+        ...current,
+        {
+          timestamp: new Date().toLocaleTimeString("fr-FR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          }),
+          verbosity: "error",
+          content: message,
+        },
+      ])
+    } finally {
+      setCreatingServiceId(null)
+    }
+  }
+
   if (!liveState.ready || !services) {
     return <div className="p-3 p-lg-4">Chargement des services...</div>
   }
 
   return (
     <>
-      <div className="d-flex flex-column h-100 w-100 p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <h1>Services • {services.length}</h1>
-          <div className="form flex-grow-1 flex-lg-grow-0" style={{ maxWidth: 420 }}>
-            <input
-              className="form-control rounded-5"
+      <PageShell>
+        <PageHeader
+          eyebrow="Service registry"
+          title="Services"
+          description="Pilotage des unités systemd, ajout de services connus ou personnalisés, accès aux logs et aux interfaces web."
+          actions={(
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                className="flex items-center gap-2"
+                onClick={() => {
+                  setCreateError(null)
+                  setCreateMode("catalog")
+                  setCreateDraft(emptyDraft())
+                  setCreateProgressLogs([])
+                  setShowCreateModal(true)
+                }}
+              >
+                <IconPlus />
+                <span>Ajouter un service</span>
+              </Button>
+              <Button variant="secondary" onClick={() => void handleRefreshServices()} disabled={refreshingServices}>
+                {refreshingServices ? <Spinner /> : <IconRefresh />}
+              </Button>
+            </div>
+          )}
+        />
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
+            <StatTile label="Services suivis" value={services.length} meta="Inventaire courant de l’instance" tone="primary" />
+          </div>
+          <div>
+            <StatTile label="En exécution" value={services.filter((service) => service.status === "running").length} meta="Unités systemd actives" tone="success" />
+          </div>
+          <div>
+            <StatTile label="En anomalie" value={services.filter((service) => service.status === "failed").length} meta="Intervention potentiellement requise" tone={services.some((service) => service.status === "failed") ? "danger" : "neutral"} />
+          </div>
+        </div>
+
+        <Surface className="flex flex-col gap-5">
+            <SectionTitle title="Liste des services" subtitle="Recherche, filtrage, actions d’administration et ouverture d’interface web." />
+            <div className="grid gap-4 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-950/40 lg:grid-cols-[minmax(0,420px)_1fr]">
+              <div className="min-w-0">
+            <Input
               type="search"
-              placeholder="Rechercher un service"
+              placeholder="Rechercher par nom, description, statut ou unité"
               value={searchStr}
               onChange={(event) => setSearchStr(event.target.value)}
             />
-          </div>
-          <Button variant="outline-secondary" onClick={() => void liveManager.refreshAll()}>
-            <IconRefresh />
-          </Button>
-        </div>
-
-        <br />
-
-        {actionError ? <Alert variant="danger" dismissible onClose={() => setActionError(null)}>{actionError}</Alert> : null}
-
-        <div className="d-flex flex-wrap justify-content-start align-items-center gap-3">
-          <div className="form-check d-flex align-items-center gap-2">
-            <input
-              className="form-check-input"
-              type="radio"
-              id="filterAll"
-              checked={statusFilters.length === 0}
-              onChange={() => setStatusFilters([])}
-            />
-            <label className="form-check-label fs-5 m-0" htmlFor="filterAll">
-              Tous
-            </label>
-          </div>
-          {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
-            <div key={status} className="form-check d-flex align-items-center gap-2">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id={status}
-                onChange={() =>
-                  setStatusFilters((prev) =>
-                    prev.includes(status) ? prev.filter((item) => item !== status) : [...prev, status],
-                  )
-                }
-                checked={statusFilters.includes(status)}
-              />
-              <label className="form-check-label fs-5 m-0" htmlFor={status}>
-                {capitalize(status)}
-              </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <input
+                    className="h-4 w-4 rounded border-slate-300 accent-sky-600"
+                    type="radio"
+                    id="filterAll"
+                    checked={statusFilters.length === 0}
+                    onChange={() => setStatusFilters([])}
+                  />
+                  <span>Tous</span>
+                </label>
+                {(["starting", "running", "stopping", "stopped", "failed"] as ServiceStatus[]).map((status) => (
+                  <label key={status} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                    <input
+                      className="h-4 w-4 rounded border-slate-300 accent-sky-600"
+                      type="checkbox"
+                      id={status}
+                      onChange={() =>
+                        setStatusFilters((prev) =>
+                          prev.includes(status) ? prev.filter((item) => item !== status) : [...prev, status],
+                        )
+                      }
+                      checked={statusFilters.includes(status)}
+                    />
+                    <span>{capitalize(status)}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
 
-        <br />
+            {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
-        <div className="d-flex flex-column gap-2">
-          {displayedServices.length <= 0 ? (
-            <Alert variant="warning">Aucun service ne correspond à cette recherche</Alert>
-          ) : (
-            displayedServices.map((service) => (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                onOpenLogs={setDisplayedLogsServiceId}
-                onAction={(serviceId, action) => void handleAction(serviceId, action)}
-                busyAction={busyAction}
-              />
-            ))
-          )}
+            <div className="flex flex-col gap-4">
+              {displayedServices.length <= 0 ? (
+                <EmptyState title="Aucun service ne correspond à cette recherche" />
+              ) : (
+                displayedServices.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    onOpenLogs={(serviceId) => void handleOpenLogs(serviceId)}
+                    onAction={(serviceId, action) => void handleAction(serviceId, action)}
+                    busyAction={busyAction}
+                    onOpenWeb={(serviceId) => navigate(`/services/${encodeURIComponent(serviceId)}/web`)}
+                  />
+                ))
+              )}
+            </div>
+        </Surface>
+      </PageShell>
+
+      {displayedLogsServiceId.trim() !== "" ? (
+      <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/60 backdrop-blur-sm">
+        <div role="dialog" aria-label="Logs service" className="h-full w-full max-w-xl overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Logs service</div>
+              <div className="mt-1 text-lg font-semibold text-slate-950 dark:text-slate-50">
+                {services.find((service) => service.id === displayedLogsServiceId)?.label ?? "Unknown service"}
+              </div>
+            </div>
+            <Button variant="secondary" onClick={() => setDisplayedLogsServiceId("")}>Fermer</Button>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+            {refreshingLogsFor === displayedLogsServiceId ? (
+              <Alert tone="neutral" className="mb-3 flex items-center gap-2">
+                <Spinner />
+                <span>Chargement des logs système...</span>
+              </Alert>
+            ) : null}
+            <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto">
+              {displayedLogs.length > 0 ? (
+                displayedLogs.map((log, index) => (
+                  <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
+                ))
+              ) : (
+                <Alert tone="warning" className="flex items-center gap-2">
+                  <IconAlertHexagon />
+                  <span>Aucun log disponible</span>
+                </Alert>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+      ) : null}
 
-      <Offcanvas
-        show={displayedLogsServiceId.trim() !== ""}
-        onHide={() => setDisplayedLogsServiceId("")}
-        placement="end"
-        style={{ "--bs-offcanvas-width": "min(560px, 100vw)" } as React.CSSProperties}
-      >
-        <Offcanvas.Header closeButton>
-          <Offcanvas.Title>
-            {services.find((service) => service.id === displayedLogsServiceId)?.label ?? "Unknown service"}
-          </Offcanvas.Title>
-        </Offcanvas.Header>
-        <Offcanvas.Body>
-          <div>
-            {displayedLogs.length > 0 ? (
-              displayedLogs.map((log, index) => (
-                <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
-              ))
-            ) : (
-              <Alert variant="warning" className="d-flex flex-row gap-2 align-items-center">
-                <IconAlertHexagon />
-                <span className="fs-4">Aucun log disponible</span>
-              </Alert>
-            )}
+      {showCreateModal ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-4">
+        <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl dark:border-slate-800 dark:bg-slate-950 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xl font-semibold text-slate-950 dark:text-slate-50">Ajouter un service</div>
+            <Button variant="secondary" onClick={() => !creatingServiceId && setShowCreateModal(false)} disabled={creatingServiceId !== null}>Fermer</Button>
           </div>
-        </Offcanvas.Body>
-      </Offcanvas>
+          {createError ? <Alert tone="danger" className="mb-3">{createError}</Alert> : null}
+          <Alert tone="warning" className="mb-4">
+            <div className="mb-1 font-semibold">Avertissement sécurité</div>
+            <div>
+              La commande bash d'installation sera exécutée sur la machine avec des privilèges élevés.
+              Toute injection, substitution non maîtrisée, expansion shell ou commande destructive peut compromettre entièrement la VM.
+              Tu es responsable du contenu exécuté, de sa provenance et de ses effets.
+            </div>
+          </Alert>
+
+          <div className="mb-6 grid gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 sm:inline-flex">
+            {[
+              ["catalog", "Recherche un service"],
+              ["installed", "Service déjà installé"],
+              ["install", "Service à installer"],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setCreateMode(mode as typeof createMode)}
+                className={`rounded-xl px-4 py-2 text-left text-sm font-medium transition sm:text-center ${
+                  createMode === mode
+                    ? "bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-slate-50"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (canCreateService) void handleCreateService()
+            }}
+          >
+            {createMode === "catalog" ? (
+              <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {knownServices.map((service) => (
+                  <div key={service.id}>
+                    <KnownServiceCard
+                      service={service}
+                      disabled={
+                        installedKnownServiceKeys.has(service.id.toLowerCase())
+                        || installedKnownServiceKeys.has(service.serviceUnit.toLowerCase())
+                        || (service.servicePath ? installedKnownServiceKeys.has(service.servicePath.toLowerCase()) : false)
+                      }
+                      onSelect={applyKnownService}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {createMode !== 'catalog' && <div className="mb-4 grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Nom affiché</span>
+                <Input
+                  value={createDraft.label}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, label: event.target.value }))}
+                  placeholder="Ollama"
+                  required
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Unité systemd</span>
+                <Input
+                  value={createDraft.serviceUnit}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, serviceUnit: event.target.value }))}
+                  placeholder="ollama.service"
+                  required
+                />
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Description</span>
+                <Input
+                  value={createDraft.description ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Service LLM local"
+                />
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">URL web exposée</span>
+                <Input
+                  value={createDraft.webUrl ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, webUrl: event.target.value }))}
+                  placeholder="http://127.0.0.1:8080"
+                  type="url"
+                />
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
+                  Si le service expose une interface web, elle sera ouvrable depuis la liste des services dans une iframe.
+                </span>
+              </label>
+            </div>
+            }
+
+            {createMode === "catalog" ? (
+              <Alert tone="neutral" className="mb-3">
+                Sélectionne un service connu ci-dessus pour préremplir le formulaire, puis complète ou ajuste les champs avant validation.
+              </Alert>
+            ) : null}
+
+            {createMode === "installed" ? (
+              <label className="mb-3 block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Chemin du service déjà installé</span>
+                <Input
+                  value={createDraft.servicePath ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, servicePath: event.target.value }))}
+                  placeholder="/etc/systemd/system/ollama.service"
+                  required
+                />
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
+                  Renseigne le chemin absolu du fichier `.service` déjà présent sur la machine.
+                </span>
+              </label>
+            ) : createMode === "install" ? (
+              <label className="mb-3 block">
+                <span className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">Commande bash d'installation</span>
+                <Textarea
+                  rows={6}
+                  value={createDraft.installCommand ?? ""}
+                  onChange={(event) => setCreateDraft((current) => ({ ...current, installCommand: event.target.value }))}
+                  placeholder={"curl -fsSL https://ollama.com/install.sh | sh\nsystemctl enable ollama\nsystemctl start ollama"}
+                  required
+                />
+                <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
+                  Cette commande sera exécutée via `sudo -n /bin/bash -lc ...`. Vérifie chaque ligne avant exécution.
+                </span>
+              </label>
+            ) : null}
+
+            <label className="mb-3 flex items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 accent-sky-600"
+                checked={createDraft.startAfterInstall}
+                onChange={(event) => setCreateDraft((current) => ({ ...current, startAfterInstall: event.target.checked }))}
+              />
+              <span>Démarrer le service après installation</span>
+            </label>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">Progression</span>
+                {creatingServiceId ? (
+                  <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                    <Spinner />
+                    <span>Exécution en cours</span>
+                  </span>
+                ) : null}
+              </div>
+              <div className="max-h-[220px] overflow-y-auto rounded-xl bg-white p-3 dark:bg-slate-950">
+                {createProgressLogs.length > 0 ? (
+                  createProgressLogs.map((log, index) => (
+                    <LogLine key={`${log.timestamp}-${index}`} timestamp={log.timestamp} verbosity={log.verbosity} content={log.content} />
+                  ))
+                ) : (
+                  <Alert tone="neutral">
+                    Les logs d’installation et d’ajout apparaîtront ici.
+                  </Alert>
+                )}
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowCreateModal(false)
+              setCreateProgressLogs([])
+            }}
+            disabled={creatingServiceId !== null}
+          >
+            Annuler
+          </Button>
+          <Button variant="primary" onClick={() => void handleCreateService()} disabled={!canCreateService || creatingServiceId !== null}>
+            {creatingServiceId ? "Ajout..." : "Ajouter"}
+          </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+      ) : null}
     </>
   )
 }

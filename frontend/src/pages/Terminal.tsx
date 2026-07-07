@@ -1,23 +1,33 @@
 import { useState } from "react"
-import { Badge, Button, Card, Form } from "react-bootstrap"
-import { IconTerminal2, IconPlayerPlay, IconRefresh } from "@tabler/icons-react"
+import { IconAlertTriangle, IconPlayerPlay, IconTerminal2, IconTrash } from "@tabler/icons-react"
 import { useHomelabLiveManager, useHomelabLiveState, useHomelabTerminal } from "../live/useHomelabLive"
+import { Alert, Button, Input, PageHeader, PageShell, SectionTitle, StatusBadge, Surface } from "../components/ui"
 
 export default function TerminalPage() {
   const liveManager = useHomelabLiveManager()
   const liveState = useHomelabLiveState()
   const terminal = useHomelabTerminal()
   const [command, setCommand] = useState("")
+  const [clearBusy, setClearBusy] = useState(false)
   const activeSession = terminal?.sessions.find((session) => session.id === terminal.activeSessionId) ?? terminal?.sessions[0]
+  const lineCount = activeSession?.lines.length ?? 0
+  const lastLine = activeSession?.lines.at(-1) ?? null
 
   const handleRun = () => {
     const trimmed = command.trim()
-    if (!trimmed) {
-      return
-    }
-
+    if (!trimmed) return
     liveManager.executeTerminalCommand(trimmed)
     setCommand("")
+  }
+
+  const handleClear = async () => {
+    if (!activeSession) return
+    setClearBusy(true)
+    try {
+      await liveManager.clearTerminalSession(activeSession.id)
+    } finally {
+      setClearBusy(false)
+    }
   }
 
   if (!liveState.ready || !terminal || !activeSession) {
@@ -25,81 +35,109 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="d-flex flex-column gap-4 p-3 p-lg-4">
-      <div className="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+    <PageShell>
+      <PageHeader
+        eyebrow="Shell access"
+        title="Terminal"
+        description="Console connectée au backend pour exécuter des commandes shell et lire leur sortie en quasi temps réel."
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge tone="neutral">
+              <IconTerminal2 size={14} />
+              {activeSession.status === "connected" ? "Session active" : activeSession.status}
+            </StatusBadge>
+            <Button
+              variant="secondary"
+              className="flex items-center gap-2"
+              onClick={() => void handleClear()}
+              disabled={clearBusy}
+            >
+              <IconTrash size={18} />
+              {clearBusy ? "Réinitialisation..." : "Réinitialiser"}
+            </Button>
+          </div>
+        )}
+      />
+
+      <Alert tone="warning" className="flex items-start gap-3">
+        <IconAlertTriangle size={18} className="mt-0.5 shrink-0" />
         <div>
-          <p className="text-uppercase text-secondary small mb-1">Shell</p>
-          <h1 className="mb-0">Terminal</h1>
-          <p className="text-secondary mb-0">Console locale simulée pour tester des commandes et lire un historique de sortie.</p>
+          <div className="font-semibold">Exécution shell libre</div>
+          <div className="mt-1">
+            Toutes les commandes saisies sont envoyées au backend. Une commande destructive, bloquante ou malformée peut impacter directement la machine.
+          </div>
         </div>
+      </Alert>
 
-        <div className="d-flex gap-2">
-          <Badge bg="dark" className="d-flex align-items-center gap-2 px-3 py-2">
-            <IconTerminal2 size={16} />
-            {activeSession.status === "connected" ? "Session active" : activeSession.status}
-          </Badge>
-          <Button variant="outline-secondary" className="d-flex align-items-center gap-2" onClick={() => void liveManager.refreshAll()}>
-            <IconRefresh size={18} />
-            Synchroniser
-          </Button>
-        </div>
-      </div>
-
-      <div className="row g-3">
-        <div className="col-12 col-xl-8">
-          <Card className="h-100">
-            <Card.Body className="d-flex flex-column gap-3">
-              <div className="rounded bg-dark text-light p-3" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-                {activeSession.lines.map((line, index) => (
-                  <div key={`${line.command}-${index}`} className="mb-3">
-                    <div className="text-success">
-                      {activeSession.prompt} {line.command}
-                    </div>
-                    {line.output.map((row) => (
-                      <div key={`${line.command}-${row}`} className={line.status === "warning" ? "text-warning" : "text-light"}>
+      <div className="min-w-0">
+        <Surface className="flex h-full flex-col">
+            <SectionTitle
+              title="Console"
+              subtitle="Historique de la session active et sortie des dernières commandes."
+              trailing={(
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge tone="neutral">{lineCount} commandes</StatusBadge>
+                  {lastLine ? <StatusBadge tone={lastLine.status === "error" ? "danger" : lastLine.status === "warning" ? "warning" : "success"}>Dernier statut: {lastLine.status}</StatusBadge> : null}
+                </div>
+              )}
+            />
+            <div className="terminal-surface flex-1">
+              {activeSession.lines.length > 0 ? activeSession.lines.map((line, index) => (
+                <div key={`${line.command}-${index}`} className="terminal-entry">
+                  <div className="terminal-entry__meta">
+                    <span className="terminal-entry__time">{line.timestamp}</span>
+                    <span className={`terminal-entry__status terminal-entry__status--${line.status}`}>{line.status}</span>
+                  </div>
+                  <div className="terminal-entry__command">
+                    <span className="text-emerald-400">{activeSession.prompt}</span> {line.command}
+                  </div>
+                  {line.output.length > 0 ? (
+                    line.output.map((row) => (
+                      <div
+                        key={`${line.command}-${row}`}
+                        className={
+                          line.status === "error"
+                            ? "text-rose-300"
+                            : line.status === "warning"
+                              ? "text-amber-300"
+                              : "text-slate-200"
+                        }
+                      >
                         {row}
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-500">Commande exécutée sans sortie.</div>
+                  )}
+                </div>
+              )) : (
+                <div className="terminal-empty-state">
+                  <div className="font-medium text-slate-100">Aucune commande exécutée</div>
+                  <div className="mt-2 text-sm text-slate-400">Saisis une commande shell ou utilise un raccourci à droite pour démarrer.</div>
+                </div>
+              )}
+            </div>
 
-              <Form
-                className="d-flex flex-column flex-md-row gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  handleRun()
-                }}
-              >
-                <Form.Control
-                  value={command}
-                  onChange={(event) => setCommand(event.target.value)}
-                  placeholder="Tape une commande, par exemple `docker ps` ou `df -h`"
-                />
-                <Button type="submit" className="d-flex align-items-center gap-2">
-                  <IconPlayerPlay size={18} />
-                  Exécuter
-                </Button>
-              </Form>
-            </Card.Body>
-          </Card>
-        </div>
-
-        <div className="col-12 col-xl-4">
-          <Card className="h-100">
-            <Card.Body>
-              <h2 className="h5 mb-3">Raccourcis</h2>
-              <div className="d-grid gap-2">
-                {activeSession.quickCommands.map((quick) => (
-                  <Button key={quick} variant="outline-secondary" onClick={() => setCommand(quick)}>
-                    {quick}
-                  </Button>
-                ))}
-              </div>
-            </Card.Body>
-          </Card>
-        </div>
+            <form
+              className="mt-3 flex flex-col gap-2 md:flex-row"
+              onSubmit={(event) => {
+                event.preventDefault()
+                handleRun()
+              }}
+            >
+              <Input
+                value={command}
+                onChange={(event) => setCommand(event.target.value)}
+                placeholder="Exemples: docker ps -a, journalctl -u docker -n 50 --no-pager, systemctl status nginx"
+                className="font-mono"
+              />
+              <Button type="submit" className="flex items-center gap-2">
+                <IconPlayerPlay size={18} />
+                Exécuter
+              </Button>
+            </form>
+        </Surface>
       </div>
-    </div>
+    </PageShell>
   )
 }

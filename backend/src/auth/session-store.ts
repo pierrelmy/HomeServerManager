@@ -21,6 +21,7 @@ interface SessionStoreOptions {
   adminEmail?: string
   adminPassword?: string
   adminDisplayName?: string
+  syncAdminOnBoot?: boolean
 }
 
 interface SessionRow {
@@ -72,7 +73,12 @@ export class SessionStore {
     this.migrate()
 
     if (options.adminEmail && options.adminPassword) {
-      this.ensureAdmin(options.adminEmail, options.adminPassword, options.adminDisplayName ?? "Administrator")
+      this.ensureAdmin(
+        options.adminEmail,
+        options.adminPassword,
+        options.adminDisplayName ?? "Administrator",
+        options.syncAdminOnBoot ?? false,
+      )
     }
   }
 
@@ -178,10 +184,18 @@ export class SessionStore {
     `)
   }
 
-  private ensureAdmin(email: string, password: string, displayName: string): void {
+  private ensureAdmin(email: string, password: string, displayName: string, syncOnBoot: boolean): void {
     const normalizedEmail = normalizeEmail(email)
-    const existing = this.database.prepare("SELECT id FROM users WHERE email = ?").get(normalizedEmail)
-    if (existing) return
+    const existing = this.database.prepare("SELECT id FROM users WHERE email = ?").get(normalizedEmail) as { id: string } | undefined
+    if (existing) {
+      if (!syncOnBoot) return
+      this.database.prepare(`
+        UPDATE users
+        SET display_name = ?, password_hash = ?, role = 'admin'
+        WHERE id = ?
+      `).run(displayName, hashPassword(password), existing.id)
+      return
+    }
     this.database.prepare(`
       INSERT INTO users (id, email, display_name, password_hash, role, created_at)
       VALUES (?, ?, ?, ?, 'admin', ?)

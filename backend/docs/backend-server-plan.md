@@ -1,5 +1,7 @@
 # Plan de mise en place du serveur
 
+> Note : ce document est un plan d’architecture historique. Pour l’état réel du backend et les instructions de développement, utiliser en priorité `backend/README.md`, `deploy/README.md` et `docs/OPERATIONS.md`.
+
 Ce document décrit la base serveur à mettre en place pour alimenter le front actuel du homelab.
 L’objectif est de garder une architecture simple au départ, mais suffisamment propre pour absorber les
 flux temps réel via WebSocket et les futures évolutions sans casser le client.
@@ -489,4 +491,3 @@ Le serveur est prêt quand:
 5. faire passer les logs et services en temps réel
 6. brancher le terminal
 7. sécuriser les actions d’administration
-

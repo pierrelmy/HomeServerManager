@@ -51,6 +51,7 @@ export function createWebsocketHomelabRealtimeTransport(url: string): HomelabRea
     connect: ({ onEvent, onStatus }): HomelabRealtimeConnection => {
       let socket: WebSocket | null = null
       let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+      let openTimer: ReturnType<typeof setTimeout> | null = null
       let reconnectAttempt = 0
       let closedByClient = false
       const pendingCommands: string[] = []
@@ -69,38 +70,43 @@ export function createWebsocketHomelabRealtimeTransport(url: string): HomelabRea
       }
 
       const openSocket = () => {
-        if (closedByClient) return
+        if (closedByClient || openTimer) return
         emitStatus("connecting")
-        const nextSocket = new WebSocket(url)
-        socket = nextSocket
+        openTimer = setTimeout(() => {
+          openTimer = null
+          if (closedByClient) return
 
-        nextSocket.addEventListener("open", () => {
-          if (socket !== nextSocket) return
-          reconnectAttempt = 0
-          emitStatus("connected")
-          while (pendingCommands.length > 0 && nextSocket.readyState === WebSocket.OPEN) {
-            nextSocket.send(pendingCommands.shift()!)
-          }
-        })
+          const nextSocket = new WebSocket(url)
+          socket = nextSocket
 
-        nextSocket.addEventListener("message", (event) => {
-          if (socket !== nextSocket || typeof event.data !== "string") return
-          const nextEvent = parseEvent(event.data)
-          if (nextEvent) onEvent(nextEvent)
-        })
+          nextSocket.addEventListener("open", () => {
+            if (socket !== nextSocket) return
+            reconnectAttempt = 0
+            emitStatus("connected")
+            while (pendingCommands.length > 0 && nextSocket.readyState === WebSocket.OPEN) {
+              nextSocket.send(pendingCommands.shift()!)
+            }
+          })
 
-        nextSocket.addEventListener("error", () => {
-          if (socket === nextSocket) emitStatus("error", "La connexion temps réel a échoué")
-        })
+          nextSocket.addEventListener("message", (event) => {
+            if (socket !== nextSocket || typeof event.data !== "string") return
+            const nextEvent = parseEvent(event.data)
+            if (nextEvent) onEvent(nextEvent)
+          })
 
-        nextSocket.addEventListener("close", () => {
-          if (socket !== nextSocket) return
-          socket = null
-          if (!closedByClient) {
-            emitStatus("disconnected")
-            scheduleReconnect()
-          }
-        })
+          nextSocket.addEventListener("error", () => {
+            if (socket === nextSocket) emitStatus("error", "La connexion temps réel a échoué")
+          })
+
+          nextSocket.addEventListener("close", () => {
+            if (socket !== nextSocket) return
+            socket = null
+            if (!closedByClient) {
+              emitStatus("disconnected")
+              scheduleReconnect()
+            }
+          })
+        }, 0)
       }
 
       openSocket()
@@ -110,6 +116,8 @@ export function createWebsocketHomelabRealtimeTransport(url: string): HomelabRea
           closedByClient = true
           if (reconnectTimer) clearTimeout(reconnectTimer)
           reconnectTimer = null
+          if (openTimer) clearTimeout(openTimer)
+          openTimer = null
           socket?.close()
           socket = null
           pendingCommands.length = 0
