@@ -387,6 +387,30 @@ describe("homelab API", () => {
     expect(newPassword.statusCode).toBe(200)
   })
 
+  it("returns structured error bodies with requestId for all error classes", async () => {
+    const instance = await setup()
+    const cookie = await login(instance)
+
+    // 400 — ZodError from request body validation
+    const badSchema = await instance.app.inject({
+      method: "PATCH",
+      url: "/settings",
+      headers: { cookie },
+      payload: { density: 999 },
+    })
+    expect(badSchema.statusCode).toBe(400)
+    expect(badSchema.json()).toMatchObject({ error: "VALIDATION_ERROR", message: expect.any(String), requestId: expect.any(String) })
+
+    // 401 — unauthorized (no session)
+    const unauth = await instance.app.inject({ method: "PATCH", url: "/settings", payload: { theme: "dark" } })
+    expect(unauth.statusCode).toBe(401)
+    expect(unauth.json()).toMatchObject({ error: "UNAUTHORIZED", message: expect.any(String), requestId: expect.any(String) })
+
+    // 404 — unknown route
+    const notFound = await instance.app.inject({ method: "GET", url: "/does-not-exist" })
+    expect(notFound.statusCode).toBe(404)
+  })
+
   it("syncs the bundle and executes commands over WebSocket", async () => {
     const instance = await setup()
     await instance.app.listen({ host: "127.0.0.1", port: 0 })

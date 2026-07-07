@@ -14,4 +14,15 @@ export default defineConfig({
   preview: {
     host: "127.0.0.1",
   },
+  build: {
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom", "react-router-dom"],
+          icons: ["@tabler/icons-react"],
+        },
+      },
+    },
+  },
 })
