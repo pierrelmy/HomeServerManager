@@ -38,7 +38,7 @@ jobs:
       - name: Validate deployment secrets
         id: validate
         run: |
-          if [ -z "$HOST" ]; then
+          if [ -z "$HOST" ] || [ "$HOST" = "PLACEHOLDER" ]; then
             echo "::notice::Production secrets not configured — deployment skipped. Add PRODUCTION_* secrets to the 'production' environment to enable SSH deployment."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
