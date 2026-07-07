@@ -152,6 +152,7 @@ En local, vous pouvez utiliser par exemple :
 - `POST /docker/images/:id/pull|run`
 - `POST /nas/scrub`
 - `POST /terminal/execute`
+- `POST /terminal/sessions/:id/clear`
 - `POST /tools/:id/run`
 - `GET /audit`
 
@@ -179,14 +180,23 @@ En production, la configuration est validée au démarrage. Les valeurs faibles 
 - `NAS_STATUS_COMMAND`
 - `METRICS_TOKEN`
 
-## Commandes terminal autorisées
+Variables optionnelles avec valeur par défaut :
 
-Le terminal n’exécute pas de shell arbitraire. Les commandes autorisées sont codées en dur :
+- `LOG_LEVEL` (défaut : `"info"`) — niveau de log pino (`"silent"` en test)
+- `METRICS_INTERVAL_MS` (défaut : `5000`) — fréquence de collecte des métriques internes
 
-- `uptime`
-- `docker ps`
-- `df -h`
-- `journalctl -p err -n 5`
+## Rate limiting
+
+- Global : 100 req/min par IP
+- `POST /session` : 10 req/min (protection bruteforce)
+- `POST /terminal/execute` : 10 commandes/min par session (fenêtre glissante côté WebSocket)
+- Actions d’administration (start/stop/restart, nas/scrub, etc.) : 5–20 req/min selon l’endpoint
+
+Les en-têtes `cookie` et `authorization` sont systématiquement **redactés** des logs (pino `redact`) afin que les tokens de session n’apparaissent jamais dans les sorties de journaux.
+
+## Commandes simulées
+
+En `SYSTEM_ADAPTER=simulation`, l’adaptateur retourne des réponses prédéfinies pour certaines commandes (`uptime`, `docker ps`, `df -h`, `journalctl -p err -n 5`) et une réponse générique pour toutes les autres. En `SYSTEM_ADAPTER=local`, le terminal exécute les commandes shell réelles sur l’hôte sans restriction côté API.
 
 ## Scripts npm
 
