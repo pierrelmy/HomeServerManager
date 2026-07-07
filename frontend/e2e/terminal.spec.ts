@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test"
 
 // Le mock terminal démarre avec une session "local-shell" et deux lignes d'historique
-// (commandes "uptime" et "docker ps"). Le bouton "Synchroniser" recharge l'état
-// depuis le mock. Il n'y a pas de bouton "Réinitialiser" — on teste donc la saisie
-// et l'exécution de commandes.
+// (commandes "uptime" et "docker ps"). La page expose un bouton "Réinitialiser" et
+// un formulaire de saisie. Il n'y a pas de bouton "Synchroniser" ni de raccourcis rapides.
 
 test.describe("Terminal", () => {
   test.beforeEach(async ({ page }) => {
@@ -12,8 +11,8 @@ test.describe("Terminal", () => {
   })
 
   test("affiche une session active", async ({ page }) => {
-    // Le badge "Session active" doit être visible
-    await expect(page.getByText("Session active")).toBeVisible()
+    // Le badge "Session active" doit être visible (exact pour éviter le match avec le sous-titre)
+    await expect(page.getByText("Session active", { exact: true })).toBeVisible()
   })
 
   test("affiche les lignes d'historique du mock", async ({ page }) => {
@@ -23,8 +22,8 @@ test.describe("Terminal", () => {
   })
 
   test("affiche le prompt de la session active", async ({ page }) => {
-    // Le prompt mock est "pierre@homeserver01:~$"
-    await expect(page.getByText(/pierre@homeserver01/)).toBeVisible()
+    // Le prompt mock est "pierre@homeserver01:~$", apparaît une fois par ligne d'historique
+    await expect(page.getByText(/pierre@homeserver01/).first()).toBeVisible()
   })
 
   test("saisir une commande et l'envoyer via Entrée → une ligne de résultat apparaît", async ({ page }) => {
@@ -46,12 +45,11 @@ test.describe("Terminal", () => {
     await expect(page.getByText(/Commande simulée: uptime/)).toBeVisible()
   })
 
-  test("utiliser un raccourci depuis le panneau rapide → remplit l'input", async ({ page }) => {
-    // Le mock définit quickCommands: ["uptime", "docker ps", "df -h", "journalctl -p err -n 5"]
-    await page.getByRole("button", { name: "docker ps" }).click()
-
+  test("l'input se vide après l'envoi d'une commande", async ({ page }) => {
     const input = page.locator("form input")
-    await expect(input).toHaveValue("docker ps")
+    await input.fill("ls -la")
+    await page.getByRole("button", { name: "Exécuter" }).click()
+    await expect(input).toHaveValue("")
   })
 
   test("commande inconnue → réponse simulée générique affichée", async ({ page }) => {
@@ -62,10 +60,10 @@ test.describe("Terminal", () => {
     await expect(page.getByText(/Commande simulée: ls -la/)).toBeVisible()
   })
 
-  test("le bouton Synchroniser recharge l'état du terminal", async ({ page }) => {
-    await page.getByRole("button", { name: "Synchroniser" }).click()
-    // Après synchronisation, le heading Terminal reste visible
+  test("le bouton Réinitialiser est disponible et cliquable", async ({ page }) => {
+    await page.getByRole("button", { name: "Réinitialiser" }).click()
+    // Après réinitialisation, le heading Terminal reste visible
     await expect(page.getByRole("heading", { name: "Terminal" })).toBeVisible()
-    await expect(page.getByText("Session active")).toBeVisible()
+    await expect(page.getByText("Session active", { exact: true })).toBeVisible()
   })
 })

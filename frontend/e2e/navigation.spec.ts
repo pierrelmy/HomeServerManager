@@ -18,7 +18,7 @@ test.describe("Navigation", () => {
   test("page Docker affiche un heading Docker", async ({ page }) => {
     await page.getByRole("link", { name: "Docker" }).click()
     await expect(page).toHaveURL("/docker")
-    await expect(page.getByRole("heading", { name: "Docker manager" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Docker" })).toBeVisible()
   })
 
   test("page NAS affiche un heading NAS", async ({ page }) => {

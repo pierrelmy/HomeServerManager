@@ -12,9 +12,9 @@ test.describe("Services", () => {
   })
 
   test("affiche la liste des services du mock", async ({ page }) => {
-    await expect(page.getByText("Ollama")).toBeVisible()
-    await expect(page.getByText("Jenkins")).toBeVisible()
-    await expect(page.getByText("Docker Engine")).toBeVisible()
+    await expect(page.getByText("Ollama", { exact: true })).toBeVisible()
+    await expect(page.getByText("Jenkins", { exact: true })).toBeVisible()
+    await expect(page.getByText("Docker Engine", { exact: true })).toBeVisible()
   })
 
   test("affiche le compteur de services suivis", async ({ page }) => {
@@ -24,28 +24,27 @@ test.describe("Services", () => {
   })
 
   test("recherche filtre la liste par nom de service", async ({ page }) => {
-    const searchInput = page.getByPlaceholder("Rechercher un service")
+    const searchInput = page.getByPlaceholder("Rechercher par nom, description, statut ou unité")
     await searchInput.fill("Jenkins")
 
-    await expect(page.getByText("Jenkins")).toBeVisible()
-    await expect(page.getByText("Ollama")).not.toBeVisible()
-    await expect(page.getByText("Docker Engine")).not.toBeVisible()
+    await expect(page.getByText("Jenkins", { exact: true })).toBeVisible()
+    await expect(page.getByText("Ollama", { exact: true })).not.toBeVisible()
+    await expect(page.getByText("Docker Engine", { exact: true })).not.toBeVisible()
   })
 
   test("recherche vide affiche à nouveau tous les services", async ({ page }) => {
-    const searchInput = page.getByPlaceholder("Rechercher un service")
+    const searchInput = page.getByPlaceholder("Rechercher par nom, description, statut ou unité")
     await searchInput.fill("Jenkins")
-    await expect(page.getByText("Ollama")).not.toBeVisible()
+    await expect(page.getByText("Ollama", { exact: true })).not.toBeVisible()
 
     await searchInput.clear()
-    await expect(page.getByText("Ollama")).toBeVisible()
-    await expect(page.getByText("Jenkins")).toBeVisible()
-    await expect(page.getByText("Docker Engine")).toBeVisible()
+    await expect(page.getByText("Ollama", { exact: true })).toBeVisible()
+    await expect(page.getByText("Jenkins", { exact: true })).toBeVisible()
+    await expect(page.getByText("Docker Engine", { exact: true })).toBeVisible()
   })
 
   test("recherche sans résultat affiche un message d'avertissement", async ({ page }) => {
-    const searchInput = page.getByPlaceholder("Rechercher un service")
-    await searchInput.fill("service-inexistant-xyz")
+    await page.getByPlaceholder("Rechercher par nom, description, statut ou unité").fill("service-inexistant-xyz")
 
     await expect(page.getByText("Aucun service ne correspond à cette recherche")).toBeVisible()
   })
@@ -68,7 +67,7 @@ test.describe("Services", () => {
   })
 
   test("démarrer Jenkins → status passe à Running", async ({ page }) => {
-    await page.getByPlaceholder("Rechercher un service").fill("Jenkins")
+    await page.getByPlaceholder("Rechercher par nom, description, statut ou unité").fill("Jenkins")
     await page.getByRole("button", { name: "Démarrer" }).click()
 
     // Après l'action start, le mock met le status à "running"
