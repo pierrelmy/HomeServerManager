@@ -1,145 +1,133 @@
-# HomeServerManager
+<div align="center">
 
-Dashboard React + Fastify pour superviser et administrer un homelab. Le monorepo contient :
+# 🖥️ HomeServerManager
 
-- `frontend/` : application React/Vite
-- `backend/` : API Fastify, sessions, audit, persistance SQLite, WebSocket `/live`
-- `deploy/` : fichiers de déploiement, Caddy, systemd, monitoring et workflow GitHub Actions
-- `docs/` : runbook d’exploitation
+**Dashboard auto-hébergé pour superviser et administrer un homelab.**
 
-## Stack
+[![CI](https://github.com/pierrelmy/HomeServerManager/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/pierrelmy/HomeServerManager/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pierrelmy/HomeServerManager?color=3b82f6&label=version)](https://github.com/pierrelmy/HomeServerManager/releases/latest)
+[![Node.js](https://img.shields.io/badge/node-%E2%89%A524-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![CodeQL](https://github.com/pierrelmy/HomeServerManager/actions/workflows/codeql.yml/badge.svg)](https://github.com/pierrelmy/HomeServerManager/actions/workflows/codeql.yml)
 
-- Node.js 24 pour le développement et la CI
-- React 19 + Vite côté frontend
-- Fastify 5 + SQLite côté backend
-- WebSocket pour le live
-- Docker / Caddy pour la partie frontend et le reverse proxy en production
+Interface React + API Fastify pour piloter services systemd, conteneurs Docker, NAS et terminal — le tout en temps réel via WebSocket.
+
+</div>
+
+---
+
+## Fonctionnalités
+
+| Module | Capacités |
+|---|---|
+| **Services** | Démarrer / arrêter / redémarrer des unités systemd, consulter les logs |
+| **Docker** | Gérer conteneurs, images et volumes |
+| **NAS** | Santé des pools, températures, résumé des sauvegardes, scrub |
+| **Terminal** | Shell interactif via WebSocket avec historique persisté |
+| **Live** | Mises à jour temps réel — pas de polling, EventHub WebSocket |
+| **Audit** | Journal chronologique de toutes les mutations admin |
+| **Métriques** | Endpoint `/metrics` compatible Prometheus + Alertmanager |
+
+## Architecture
+
+```
+frontend/   React 19 + Vite — HTTP (REST) + WebSocket (live)
+backend/    Fastify 5 + SQLite — routes, sessions signées, audit, EventHub
+deploy/     Caddy, systemd, Docker Compose, backup SQLite, scripts
+docs/       Runbook d'exploitation, rotation des secrets
+```
+
+Le backend s'exécute sur l'hôte (accès Docker, systemd, NAS). Le frontend et Caddy sont conteneurisés. Le live est assuré par un canal WebSocket `/live` qui envoie un bundle complet à la connexion puis des événements granulaires sur chaque mutation.
 
 ## Développement local
 
-Prérequis :
-
-- Node.js 24
-- npm
-- Chromium installé via Playwright si vous voulez lancer les E2E
-
-Installation :
+**Prérequis :** Node.js ≥ 24, npm.
 
 ```bash
 cd backend && npm ci
 cd ../frontend && npm ci
 ```
 
-### Option 1 : backend + frontend en local
+### Option 1 — backend + frontend
 
-Terminal 1, backend :
+Terminal 1 — backend :
 
 ```bash
 cd backend
-HOST=127.0.0.1 \
-PORT=3000 \
-NODE_ENV=development \
-SESSION_SECRET=development-only-session-secret-change-me \
+HOST=127.0.0.1 PORT=3000 NODE_ENV=development \
+SESSION_SECRET=dev-secret-at-least-32-chars \
 CORS_ORIGINS=http://localhost:5173 \
 READ_AUTH_REQUIRED=false \
 DATABASE_PATH=./data/homelab.dev.db \
-ADMIN_EMAIL=admin@localhost.test \
-ADMIN_PASSWORD=development-password \
-ADMIN_DISPLAY_NAME="Homelab Admin" \
+ADMIN_EMAIL=admin@localhost.test ADMIN_PASSWORD=dev-password \
+ADMIN_DISPLAY_NAME="Admin" \
 SYSTEM_ADAPTER=simulation \
-SYSTEM_SERVICE_MAP='{}' \
-NAS_SCRUB_COMMAND='[]' \
-NAS_STATUS_COMMAND='[]' \
-TOOL_COMMANDS='{"update-hsm":["sudo","-n","/bin/bash","/srv/homeservermanager-dev/deploy/update-hsm-dev.sh"]}' \
-METRICS_TOKEN=development-metrics-token \
+SYSTEM_SERVICE_MAP='{}' NAS_SCRUB_COMMAND='[]' NAS_STATUS_COMMAND='[]' \
+TOOL_COMMANDS='{}' METRICS_TOKEN=dev-metrics-token \
 npm run dev
 ```
 
-Terminal 2, frontend branché sur le backend :
+Terminal 2 — frontend branché sur le backend :
 
 ```bash
 cd frontend
-VITE_API_BASE_URL=http://127.0.0.1:3000 \
-VITE_WS_URL=ws://127.0.0.1:3000/live \
-npm run dev
+VITE_API_BASE_URL=http://127.0.0.1:3000 VITE_WS_URL=ws://127.0.0.1:3000/live npm run dev
 ```
 
-Application :
+Application : `http://localhost:5173` — identifiants : `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
-- frontend : `http://localhost:5173`
-- backend : `http://127.0.0.1:3000`
-- identifiants admin initiaux : `ADMIN_EMAIL` / `ADMIN_PASSWORD`
+> `SYSTEM_ADAPTER=simulation` évite toute action réelle sur Docker, systemd ou le NAS.
 
-En local, `SYSTEM_ADAPTER=simulation` évite toute action réelle sur Docker, systemd ou le NAS.
+### Option 2 — frontend seul (mode mock)
 
-Si vous voulez tester le bouton de mise à jour depuis l’onglet Tools avec `SYSTEM_ADAPTER=local`, ajoutez aussi `update-hsm` dans `TOOL_COMMANDS`. L’appel recommandé pointe vers le script du repo pour éviter d’exécuter une copie installée obsolète.
-
-### Option 2 : frontend seul en mode mock
-
-Le frontend peut tourner sans backend si `VITE_API_BASE_URL` et `VITE_WS_URL` ne sont pas définies.
+Aucun backend requis. Données et actions proviennent des repositories mock :
 
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
 
-Dans ce mode, les données et actions proviennent des repositories mock et du transport live mock.
+Le mode mock s'active automatiquement quand `VITE_API_BASE_URL` et `VITE_WS_URL` ne sont pas définies. Pour l'activer explicitement : `VITE_ALLOW_MOCKS=true npm run dev`.
 
-### Option 3 : backend local conteneurisé
-
-Une stack Docker de développement existe pour l’API seule, toujours en mode simulation :
+### Option 3 — backend conteneurisé
 
 ```bash
 cd backend/infra
 SESSION_SECRET="$(openssl rand -hex 32)" \
-ADMIN_EMAIL="admin@localhost.test" \
-ADMIN_PASSWORD="development-password" \
-METRICS_TOKEN="development-metrics-token" \
+ADMIN_EMAIL="admin@localhost.test" ADMIN_PASSWORD="dev-password" \
+METRICS_TOKEN="dev-metrics-token" \
 docker compose up --build
 ```
 
-Le backend écoute alors sur `http://localhost:3000`.
-
 ## Vérification locale
 
-Depuis la racine :
-
 ```bash
-npm run check
+npm run check          # lint + tests + build (backend + frontend)
+cd frontend && npm run test:e2e   # E2E Playwright (nécessite Chromium)
 ```
 
-Détail :
-
-- `npm run lint` : lint backend + frontend
-- `npm run test` : tests backend + frontend
-- `npm run build` : builds backend + frontend
-
-Commandes ciblées :
+Pour installer Chromium :
 
 ```bash
-cd backend && npm run typecheck && npm run lint && npm test && npm run build
-cd frontend && npm run lint && npm test && npm run build
-cd frontend && npx playwright install --with-deps chromium && npm run test:e2e
+cd frontend && npx playwright install --with-deps chromium
 ```
-
-## Modes d’exécution
-
-- Développement local : backend en `SYSTEM_ADAPTER=simulation`, base SQLite locale
-- Production : backend sur l’hôte, frontend et Caddy en conteneurs, monitoring Prometheus optionnel
 
 ## Production
 
-Le backend s’exécute sur l’hôte avec un utilisateur système restreint parce qu’il pilote Docker, systemd et le NAS. Le frontend et Caddy sont conteneurisés.
+Le backend s'exécute sur l'hôte avec un utilisateur système restreint. Le frontend et Caddy sont conteneurisés, avec ressources bornées.
 
-Références :
+**GitHub Actions couvre :**
+- CI (lint, tests unitaires, E2E Playwright, builds Docker)
+- CodeQL (analyse statique)
+- Publication des images GHCR (`ghcr.io/pierrelmy/homeservermanager-*`)
+- Release automatique via release-please (versioning sémantique depuis les commits conventionnels)
+- Déploiement SSH vers l'environnement `production` (déclenché manuellement)
 
-- [Guide de déploiement](deploy/README.md)
-- [Runbook d’exploitation](docs/OPERATIONS.md)
-- [Politique de sécurité](SECURITY.md)
+## Documentation
 
-GitHub Actions couvre :
-
-- CI
-- CodeQL
-- publication des images GHCR
-- déploiement manuel via l’environnement protégé `production`
+| Guide | Contenu |
+|---|---|
+| [Déploiement](deploy/README.md) | Préparation de l'hôte, secrets GitHub, premier démarrage, backup |
+| [Runbook](docs/OPERATIONS.md) | Contrôles, sauvegarde, restauration, rollback, incidents |
+| [Rotation des secrets](docs/SECRET_ROTATION.md) | SESSION_SECRET, ADMIN_PASSWORD, METRICS_TOKEN |
+| [Backend](backend/README.md) | Variables d'env, endpoints, rate limiting, modes |
+| [Frontend](frontend/README.md) | Variables, mode mock, tests E2E, build |
+| [Sécurité](SECURITY.md) | Signalement de vulnérabilités, secrets GitHub, contraintes sudoers |
