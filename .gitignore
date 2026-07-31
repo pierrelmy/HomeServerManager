@@ -2,3 +2,4 @@
 deploy/.env
 deploy/secrets/
 .claude/worktrees/
+graphify-out/
